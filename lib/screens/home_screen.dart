@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 
 import '../config/app_theme.dart';
@@ -159,9 +160,11 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       await _handleUnauthorized(e.message);
       rethrow;
+    } on _LocationRequirementException {
+      return;
     } on ApiException catch (e) {
       if (!mounted) return;
-      _showError(e.message);
+      _showApiFailure(e);
       rethrow;
     } catch (_) {
       if (!mounted) return;
@@ -183,9 +186,11 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       await _handleUnauthorized(e.message);
       rethrow;
+    } on _LocationRequirementException {
+      return;
     } on ApiException catch (e) {
       if (!mounted) return;
-      _showError(e.message);
+      _showApiFailure(e);
       rethrow;
     } catch (_) {
       if (!mounted) return;
@@ -228,22 +233,221 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<ClockLocationResult> _acquireLocationForClockAction() async {
     setState(() => _isAcquiringLocation = true);
     try {
-      final result = await _locationService.getClockLocation();
-      if (!mounted) {
-        return const ClockLocationResult();
+      var remainingAttempts = 2;
+
+      while (remainingAttempts > 0) {
+        final result = await _locationService.getClockLocation();
+        if (!mounted) {
+          return const ClockLocationResult();
+        }
+
+        final warning = result.warning;
+        if (warning != null && warning.trim().isNotEmpty) {
+          _showWarning(warning);
+        }
+
+        if (result.hasCoordinates) {
+          return result;
+        }
+
+        remainingAttempts -= 1;
+        if (remainingAttempts <= 0) {
+          throw _LocationRequirementException();
+        }
+
+        final shouldRetry = await _handleLocationFailure(result);
+        if (!mounted) {
+          return const ClockLocationResult();
+        }
+
+        if (!shouldRetry) {
+          throw _LocationRequirementException();
+        }
       }
 
-      final warning = result.warning;
-      if (warning != null && warning.trim().isNotEmpty) {
-        _showWarning(warning);
-      }
-
-      return result;
+      throw _LocationRequirementException();
     } finally {
       if (mounted) {
         setState(() => _isAcquiringLocation = false);
       }
     }
+  }
+
+  Future<bool> _handleLocationFailure(ClockLocationResult result) async {
+    final reason = result.failureReason;
+    final action = await _showLocationRecoveryDialog(reason);
+    if (!mounted) return false;
+
+    switch (action) {
+      case _LocationRecoveryAction.retry:
+        return true;
+      case _LocationRecoveryAction.openLocationSettings:
+        await Geolocator.openLocationSettings();
+        return false;
+      case _LocationRecoveryAction.openAppSettings:
+        await Geolocator.openAppSettings();
+        return false;
+      case _LocationRecoveryAction.cancel:
+      case null:
+        return false;
+    }
+  }
+
+  Future<_LocationRecoveryAction?> _showLocationRecoveryDialog(
+    ClockLocationFailureReason? reason,
+  ) async {
+    String title;
+    String message;
+    List<_LocationRecoveryAction> actions;
+
+    switch (reason) {
+      case ClockLocationFailureReason.serviceDisabled:
+        title = 'Location service is off';
+        message =
+            'Turn on device location service to continue clock in/out. You can retry after enabling it.';
+        actions = const [
+          _LocationRecoveryAction.openLocationSettings,
+          _LocationRecoveryAction.retry,
+          _LocationRecoveryAction.cancel,
+        ];
+        break;
+      case ClockLocationFailureReason.permissionDenied:
+        title = 'Location permission required';
+        message =
+            'Clock actions require location permission. Grant permission and retry.';
+        actions = const [
+          _LocationRecoveryAction.retry,
+          _LocationRecoveryAction.cancel,
+        ];
+        break;
+      case ClockLocationFailureReason.permissionDeniedForever:
+        title = 'Permission blocked';
+        message =
+            'Location permission is permanently denied. Open app settings to allow location access, then retry.';
+        actions = const [
+          _LocationRecoveryAction.openAppSettings,
+          _LocationRecoveryAction.retry,
+          _LocationRecoveryAction.cancel,
+        ];
+        break;
+      case ClockLocationFailureReason.timeout:
+        title = 'Location timed out';
+        message =
+            'GPS is taking too long. Move to an open area or stronger signal, then retry.';
+        actions = const [
+          _LocationRecoveryAction.retry,
+          _LocationRecoveryAction.cancel,
+        ];
+        break;
+      case ClockLocationFailureReason.unavailable:
+      case null:
+        title = 'Location unavailable';
+        message = 'Unable to fetch location right now. Please retry.';
+        actions = const [
+          _LocationRecoveryAction.retry,
+          _LocationRecoveryAction.cancel,
+        ];
+        break;
+    }
+
+    return showDialog<_LocationRecoveryAction>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            for (final action in actions)
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(action),
+                child: Text(_locationRecoveryLabel(action)),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _locationRecoveryLabel(_LocationRecoveryAction action) {
+    switch (action) {
+      case _LocationRecoveryAction.retry:
+        return 'Retry';
+      case _LocationRecoveryAction.openLocationSettings:
+        return 'Location Settings';
+      case _LocationRecoveryAction.openAppSettings:
+        return 'App Settings';
+      case _LocationRecoveryAction.cancel:
+        return 'Cancel';
+    }
+  }
+
+  void _showApiFailure(ApiException error) {
+    switch (error.code) {
+      case 'outside_allowed_area':
+        _showError(_buildOutsideAreaMessage(error));
+        return;
+      case 'gps_required':
+        _showWarning('Location is required for clock in/out. Turn on GPS and retry.');
+        return;
+      case 'office_location_not_configured':
+        _showError('Office geofence is not configured yet. Contact your admin.');
+        return;
+      default:
+        _showError(error.message);
+    }
+  }
+
+  String _buildOutsideAreaMessage(ApiException error) {
+    final metadata = error.metadata;
+    if (metadata == null) {
+      return error.message;
+    }
+
+    final officeName = metadata['officeName']?.toString();
+    final guidance = metadata['guidance']?.toString();
+    final distanceMeters = _toDouble(metadata['distanceMeters']);
+    final effectiveRadiusMeters = _toDouble(metadata['effectiveRadiusMeters']);
+    final allowedRadiusMeters = _toDouble(metadata['allowedRadiusMeters']);
+
+    final parts = <String>[];
+
+    if (officeName != null && officeName.trim().isNotEmpty) {
+      parts.add('Outside allowed area for $officeName.');
+    } else {
+      parts.add('You are outside the allowed office geofence.');
+    }
+
+    if (distanceMeters != null && effectiveRadiusMeters != null) {
+      parts.add(
+        'Current distance ${distanceMeters.toStringAsFixed(0)}m, allowed ${effectiveRadiusMeters.toStringAsFixed(0)}m.',
+      );
+    } else if (distanceMeters != null && allowedRadiusMeters != null) {
+      parts.add(
+        'Current distance ${distanceMeters.toStringAsFixed(0)}m, allowed ${allowedRadiusMeters.toStringAsFixed(0)}m.',
+      );
+    }
+
+    if (guidance != null && guidance.trim().isNotEmpty) {
+      parts.add(guidance);
+    }
+
+    if (parts.isEmpty) {
+      return error.message;
+    }
+
+    return parts.join(' ');
+  }
+
+  double? _toDouble(Object? value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    if (value is String) {
+      return double.tryParse(value);
+    }
+
+    return null;
   }
 
   Future<void> _handleUnauthorized(String message) async {
@@ -708,4 +912,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
+}
+
+class _LocationRequirementException implements Exception {}
+
+enum _LocationRecoveryAction {
+  retry,
+  openLocationSettings,
+  openAppSettings,
+  cancel,
 }

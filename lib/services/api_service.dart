@@ -152,19 +152,24 @@ class ApiService {
   }
 
   void _throwIfRequestFailed(http.Response response) {
+    final parsed = _parseErrorPayload(response.body);
+
     if (response.statusCode == HttpStatus.unauthorized) {
       clearSession();
       throw UnauthorizedApiException(
         response.statusCode,
-        _parseError(
-          response.body,
-          fallback: 'Session expired. Please sign in again.',
-        ),
+        parsed.message ?? 'Session expired. Please sign in again.',
       );
     }
 
     if (response.statusCode != HttpStatus.ok) {
-      throw ApiException(response.statusCode, _parseError(response.body));
+      throw ApiException(
+        response.statusCode,
+        parsed.message ?? 'Request failed.',
+        code: parsed.code,
+        detail: parsed.detail,
+        metadata: parsed.metadata,
+      );
     }
   }
 
@@ -176,7 +181,8 @@ class ApiService {
     return {'latitude': latitude, 'longitude': longitude};
   }
 
-  String _parseError(String body, {String fallback = 'Request failed.'}) {
+  _ParsedApiError _parseErrorPayload(String body,
+      {String fallback = 'Request failed.'}) {
     try {
       final json = jsonDecode(body);
       if (json is Map<String, dynamic>) {
@@ -190,35 +196,81 @@ class ApiService {
             }
           }
           if (messages.isNotEmpty) {
-            return messages.join(' ');
+            return _ParsedApiError(
+              message: messages.join(' '),
+              code: json['code']?.toString(),
+              detail: json['detail']?.toString(),
+              metadata: _toStringMap(json['metadata']),
+            );
           }
         }
 
-        return (json['message'] ??
+        final message = (json['message'] ??
                 json['detail'] ??
                 json['error'] ??
                 json['title'] ??
                 fallback)
             .toString();
+
+        return _ParsedApiError(
+          message: message,
+          code: json['code']?.toString(),
+          detail: json['detail']?.toString(),
+          metadata: _toStringMap(json['metadata']),
+        );
       }
     } catch (_) {}
+
     if (body.trim().isEmpty) {
-      return fallback;
+      return _ParsedApiError(message: fallback);
     }
-    return body;
+
+    return _ParsedApiError(message: body);
+  }
+
+  Map<String, dynamic>? _toStringMap(Object? value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+
+    return null;
   }
 }
 
 class ApiException implements Exception {
   final int statusCode;
   final String message;
+  final String? code;
+  final String? detail;
+  final Map<String, dynamic>? metadata;
 
-  ApiException(this.statusCode, this.message);
+  ApiException(
+    this.statusCode,
+    this.message, {
+    this.code,
+    this.detail,
+    this.metadata,
+  });
 
   @override
-  String toString() => 'ApiException($statusCode): $message';
+  String toString() =>
+      'ApiException($statusCode, code: $code, detail: $detail): $message';
 }
 
 class UnauthorizedApiException extends ApiException {
   UnauthorizedApiException(super.statusCode, super.message);
+}
+
+class _ParsedApiError {
+  final String? message;
+  final String? code;
+  final String? detail;
+  final Map<String, dynamic>? metadata;
+
+  _ParsedApiError({
+    this.message,
+    this.code,
+    this.detail,
+    this.metadata,
+  });
 }
