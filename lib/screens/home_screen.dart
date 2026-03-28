@@ -9,8 +9,12 @@ import 'package:intl/intl.dart';
 import '../config/app_theme.dart';
 import '../config/page_transitions.dart';
 import '../models/attendance.dart';
+import '../models/attendance_history.dart';
 import '../screens/history_screen.dart';
+import '../screens/login_screen.dart';
 import '../services/api_service.dart';
+import '../services/auth_session_storage.dart';
+import '../services/location_service.dart';
 import '../widgets/animated_clock_button.dart';
 import '../widgets/status_indicator.dart';
 
@@ -18,11 +22,7 @@ class HomeScreen extends StatefulWidget {
   final int userId;
   final String userName;
 
-  const HomeScreen({
-    super.key,
-    required this.userId,
-    required this.userName,
-  });
+  const HomeScreen({super.key, required this.userId, required this.userName});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -30,10 +30,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _apiService = ApiService();
+  final _locationService = LocationService();
 
   bool _isLoading = true;
+  bool _isAcquiringLocation = false;
   bool _isClockedIn = false;
+  List<Attendance> _todayRecords = [];
+  AttendanceSummaryTotals _totals = AttendanceSummaryTotals.zero;
   Attendance? _lastAttendance;
+  Timer? _liveTicker;
 
   @override
   void initState() {
@@ -41,21 +46,85 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchTodayStatus();
   }
 
+  @override
+  void dispose() {
+    _liveTicker?.cancel();
+    super.dispose();
+  }
+
+  Attendance? get _activeSession {
+    for (final record in _todayRecords) {
+      if (record.isClockedIn) {
+        return record;
+      }
+    }
+    return null;
+  }
+
+  Duration get _todayTotalDuration {
+    var total = Duration.zero;
+    for (final record in _todayRecords) {
+      final duration = record.duration;
+      if (duration == null || duration.isNegative) continue;
+      total += duration;
+    }
+    return total;
+  }
+
+  Duration get _dailyTotalDuration {
+    if (_totals.dailyHours > 0) {
+      return _durationFromHours(_totals.dailyHours);
+    }
+
+    return _todayTotalDuration;
+  }
+
+  Duration get _weeklyTotalDuration => _durationFromHours(_totals.weeklyHours);
+
+  Duration _durationFromHours(double hours) {
+    return Duration(minutes: (hours * 60).round());
+  }
+
+  void _syncLiveTicker() {
+    if (_activeSession != null) {
+      _liveTicker ??= Timer.periodic(const Duration(seconds: 30), (_) {
+        if (!mounted) return;
+        setState(() {});
+      });
+      return;
+    }
+
+    _liveTicker?.cancel();
+    _liveTicker = null;
+  }
+
+  void _applyTodayRecords(List<Attendance> records) {
+    _todayRecords = records;
+    _lastAttendance = records.isNotEmpty ? records.first : null;
+    _isClockedIn = _activeSession != null;
+    _syncLiveTicker();
+  }
+
   Future<void> _fetchTodayStatus() async {
     setState(() => _isLoading = true);
     try {
-      final records = await _apiService.getTodayAttendance(widget.userId);
+      final nowUtc = DateTime.now().toUtc();
+      final startUtc = DateTime.utc(nowUtc.year, nowUtc.month, nowUtc.day);
+      final endUtc = startUtc.add(const Duration(days: 1));
+      final response = await _apiService.getAttendanceHistory(
+        startUtc: startUtc,
+        endUtc: endUtc,
+      );
+
       if (!mounted) return;
       setState(() {
-        if (records.isNotEmpty) {
-          _lastAttendance = records.first;
-          _isClockedIn = _lastAttendance!.isClockedIn;
-        } else {
-          _lastAttendance = null;
-          _isClockedIn = false;
-        }
+        _applyTodayRecords(response.records);
+        _totals = response.totals;
         _isLoading = false;
       });
+    } on UnauthorizedApiException catch (e) {
+      if (!mounted) return;
+      await _handleUnauthorized(e.message);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -74,12 +143,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _handleClockIn() async {
     HapticFeedback.mediumImpact();
     try {
-      final record = await _apiService.clockIn(widget.userId);
+      final location = await _acquireLocationForClockAction();
+      await _apiService.clockIn(
+        latitude: location.latitude,
+        longitude: location.longitude,
+      );
+      await _fetchTodayStatus();
+    } on UnauthorizedApiException catch (e) {
       if (!mounted) return;
-      setState(() {
-        _lastAttendance = record;
-        _isClockedIn = true;
-      });
+      await _handleUnauthorized(e.message);
+      rethrow;
     } on ApiException catch (e) {
       if (!mounted) return;
       _showError(e.message);
@@ -94,12 +167,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _handleClockOut() async {
     HapticFeedback.mediumImpact();
     try {
-      final record = await _apiService.clockOut(widget.userId);
+      final location = await _acquireLocationForClockAction();
+      await _apiService.clockOut(
+        latitude: location.latitude,
+        longitude: location.longitude,
+      );
+      await _fetchTodayStatus();
+    } on UnauthorizedApiException catch (e) {
       if (!mounted) return;
-      setState(() {
-        _lastAttendance = record;
-        _isClockedIn = false;
-      });
+      await _handleUnauthorized(e.message);
+      rethrow;
     } on ApiException catch (e) {
       if (!mounted) return;
       _showError(e.message);
@@ -120,8 +197,10 @@ class _HomeScreenState extends State<HomeScreen> {
             Icon(Icons.error_outline, color: colors.onErrorContainer),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
-              child: Text(message,
-                  style: TextStyle(color: colors.onErrorContainer)),
+              child: Text(
+                message,
+                style: TextStyle(color: colors.onErrorContainer),
+              ),
             ),
           ],
         ),
@@ -130,12 +209,70 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _navigateToHistory() {
-    Navigator.of(context).push(
-      SlideFadeRoute(
-        page: HistoryScreen(userId: widget.userId),
+  void _showWarning(String message) {
+    final colors = Theme.of(context).colorScheme;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: colors.secondaryContainer,
       ),
     );
+  }
+
+  Future<ClockLocationResult> _acquireLocationForClockAction() async {
+    setState(() => _isAcquiringLocation = true);
+    try {
+      final result = await _locationService.getClockLocation();
+      if (!mounted) {
+        return const ClockLocationResult();
+      }
+
+      final warning = result.warning;
+      if (warning != null && warning.trim().isNotEmpty) {
+        _showWarning(warning);
+      }
+
+      return result;
+    } finally {
+      if (mounted) {
+        setState(() => _isAcquiringLocation = false);
+      }
+    }
+  }
+
+  Future<void> _handleUnauthorized(String message) async {
+    setState(() {
+      _isLoading = false;
+      _isClockedIn = false;
+      _todayRecords = [];
+      _totals = AttendanceSummaryTotals.zero;
+      _lastAttendance = null;
+    });
+    _syncLiveTicker();
+    await AuthSessionStorage.clear();
+    ApiService.clearSession();
+    _showError(message);
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      SlideFadeRoute(page: const LoginScreen(), direction: SlideDirection.down),
+      (route) => false,
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    _liveTicker?.cancel();
+    _liveTicker = null;
+    ApiService.clearSession();
+    await AuthSessionStorage.clear();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      SlideFadeRoute(page: const LoginScreen(), direction: SlideDirection.down),
+      (route) => false,
+    );
+  }
+
+  void _navigateToHistory() {
+    Navigator.of(context).push(SlideFadeRoute(page: const HistoryScreen()));
   }
 
   // ── Helpers ──
@@ -215,57 +352,62 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildGreeting(ColorScheme colors, TextTheme textTheme) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Hero(
-              tag: 'app-logo',
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  shape: BoxShape.circle,
+            Row(
+              children: [
+                Hero(
+                  tag: 'app-logo',
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: colors.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.access_time_filled_rounded,
+                      size: 24,
+                      color: colors.primary,
+                    ),
+                  ),
                 ),
-                child: Icon(
-                  Icons.access_time_filled_rounded,
-                  size: 24,
-                  color: colors.primary,
+                const Spacer(),
+                IconButton(
+                  onPressed: _navigateToHistory,
+                  icon: const Icon(Icons.history_rounded),
+                  tooltip: 'History',
                 ),
+                IconButton(
+                  onPressed: _handleLogout,
+                  icon: const Icon(Icons.logout_rounded),
+                  tooltip: 'Logout',
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              '$_greeting,',
+              style: textTheme.titleMedium?.copyWith(
+                color: colors.onSurfaceVariant,
               ),
             ),
-            const Spacer(),
-            IconButton(
-              onPressed: _navigateToHistory,
-              icon: const Icon(Icons.history_rounded),
-              tooltip: 'History',
+            Text(
+              widget.userName,
+              style: textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: colors.onSurface,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              _todayDate,
+              style: textTheme.bodyMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
             ),
           ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Text(
-          '$_greeting,',
-          style: textTheme.titleMedium?.copyWith(
-            color: colors.onSurfaceVariant,
-          ),
-        ),
-        Text(
-          widget.userName,
-          style: textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: colors.onSurface,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          _todayDate,
-          style: textTheme.bodyMedium?.copyWith(
-            color: colors.onSurfaceVariant,
-          ),
-        ),
-      ],
-    )
+        )
         .animate()
         .fadeIn(duration: AppDurations.emphasis)
         .slideY(begin: -0.1, end: 0, duration: AppDurations.emphasis);
@@ -274,76 +416,90 @@ class _HomeScreenState extends State<HomeScreen> {
   // ── Status Card (Glassmorphism) ──
 
   Widget _buildStatusCard(ColorScheme colors, TextTheme textTheme) {
+    final activeSession = _activeSession;
+
     return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadius.xl),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadius.xl),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colors.primaryContainer.withValues(alpha: 0.7),
-                colors.primaryContainer.withValues(alpha: 0.4),
-              ],
-            ),
-            border: Border.all(
-              color: colors.primary.withValues(alpha: 0.2),
-            ),
-          ),
-          child: Row(
-            children: [
-              StatusIndicator(isActive: _isClockedIn),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _isClockedIn ? 'Clocked In' : 'Not Clocked In',
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      _isClockedIn && _lastAttendance?.clockIn != null
-                          ? 'Since ${_formatTime(_lastAttendance!.clockIn)}'
-                          : 'Tap the button below to clock in',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: colors.onPrimaryContainer.withValues(alpha: 0.8),
-                      ),
-                    ),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    colors.primaryContainer.withValues(alpha: 0.7),
+                    colors.primaryContainer.withValues(alpha: 0.4),
                   ],
                 ),
+                border: Border.all(
+                  color: colors.primary.withValues(alpha: 0.2),
+                ),
               ),
-              if (_isClockedIn && _lastAttendance != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: AppSpacing.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
-                  child: Text(
-                    _formatDuration(_lastAttendance!.duration),
-                    style: textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: colors.primary,
+              child: Row(
+                children: [
+                  StatusIndicator(isActive: _isClockedIn),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isClockedIn ? 'Clocked In' : 'Not Clocked In',
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colors.onPrimaryContainer,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          _isClockedIn && activeSession?.clockIn != null
+                              ? 'Since ${_formatTime(activeSession!.clockIn)}'
+                              : 'Tap the button below to clock in',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colors.onPrimaryContainer.withValues(
+                              alpha: 0.8,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Today: ${_formatDuration(_dailyTotalDuration)}  |  Week: ${_formatDuration(_weeklyTotalDuration)}',
+                          style: textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colors.onPrimaryContainer.withValues(
+                              alpha: 0.9,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-            ],
+                  if (_isClockedIn && activeSession != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Text(
+                        _formatDuration(activeSession.duration),
+                        style: textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: colors.primary,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
-    )
+        )
         .animate()
         .fadeIn(duration: AppDurations.emphasis, delay: 100.ms)
         .slideY(begin: 0.15, end: 0, duration: AppDurations.emphasis);
@@ -352,23 +508,25 @@ class _HomeScreenState extends State<HomeScreen> {
   // ── Clock Buttons ──
 
   Widget _buildClockButtons() {
-    return AnimatedSwitcher(
-      duration: AppDurations.standard,
-      switchInCurve: Curves.easeOut,
-      switchOutCurve: Curves.easeIn,
-      transitionBuilder: (child, animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: ScaleTransition(scale: animation, child: child),
-        );
-      },
-      child: _isLoading
-          ? const SizedBox(
-              key: ValueKey('loading'),
-              height: 64,
-              child: Center(child: CircularProgressIndicator()),
-            )
-          : _isClockedIn
+    return Column(
+      children: [
+        AnimatedSwitcher(
+          duration: AppDurations.standard,
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(scale: animation, child: child),
+            );
+          },
+          child: _isLoading
+              ? const SizedBox(
+                  key: ValueKey('loading'),
+                  height: 64,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : _isClockedIn
               ? AnimatedClockButton(
                   key: const ValueKey('clock-out'),
                   label: 'Clock Out',
@@ -380,12 +538,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   key: const ValueKey('clock-in'),
                   label: 'Clock In',
                   icon: Icons.login_rounded,
-                  gradientColors: [
-                    Colors.green.shade500,
-                    Colors.teal.shade400,
-                  ],
+                  gradientColors: [Colors.green.shade500, Colors.teal.shade400],
                   onPressed: _handleClockIn,
                 ),
+        ),
+        if (_isAcquiringLocation)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            child: Text(
+              'Acquiring location...',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+      ],
     );
   }
 
@@ -402,8 +567,11 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             children: [
-              Icon(Icons.event_available_rounded,
-                  size: 40, color: colors.onSurfaceVariant.withValues(alpha: 0.5)),
+              Icon(
+                Icons.event_available_rounded,
+                size: 40,
+                color: colors.onSurfaceVariant.withValues(alpha: 0.5),
+              ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 'No attendance recorded today',
@@ -419,69 +587,71 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final att = _lastAttendance!;
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Last Attendance',
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Row(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Flexible(
-                  child: _timeChip(
-                    icon: Icons.login_rounded,
-                    label: 'In',
-                    time: _formatTime(att.clockIn),
-                    color: Colors.green,
-                    colors: colors,
-                    textTheme: textTheme,
+                Text(
+                  'Last Attendance',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Flexible(
-                  child: _timeChip(
-                    icon: Icons.logout_rounded,
-                    label: 'Out',
-                    time: _formatTime(att.clockOut),
-                    color: att.clockOut != null ? Colors.red : colors.outline,
-                    colors: colors,
-                    textTheme: textTheme,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors.tertiaryContainer,
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                    child: Text(
-                      _formatDuration(att.duration),
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.onTertiaryContainer,
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Flexible(
+                      child: _timeChip(
+                        icon: Icons.login_rounded,
+                        label: 'In',
+                        time: _formatTime(att.clockIn),
+                        color: Colors.green,
+                        colors: colors,
+                        textTheme: textTheme,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Flexible(
+                      child: _timeChip(
+                        icon: Icons.logout_rounded,
+                        label: 'Out',
+                        time: _formatTime(att.clockOut),
+                        color: att.clockOut != null
+                            ? Colors.red
+                            : colors.outline,
+                        colors: colors,
+                        textTheme: textTheme,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                          vertical: AppSpacing.xs,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colors.tertiaryContainer,
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                        ),
+                        child: Text(
+                          _formatDuration(att.duration),
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colors.onTertiaryContainer,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    )
+          ),
+        )
         .animate()
         .fadeIn(duration: AppDurations.emphasis, delay: 200.ms)
         .slideY(begin: 0.2, end: 0, duration: AppDurations.emphasis);

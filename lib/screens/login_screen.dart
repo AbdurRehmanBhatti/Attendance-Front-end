@@ -7,6 +7,7 @@ import '../config/app_theme.dart';
 import '../config/page_transitions.dart';
 import '../screens/home_screen.dart';
 import '../services/api_service.dart';
+import '../services/auth_session_storage.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,7 +19,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _apiService = ApiService();
 
@@ -51,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void dispose() {
     _shakeController.dispose();
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -62,18 +63,19 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _isLoading = true);
 
     try {
-      final userId = await _apiService.login(
-        _usernameController.text.trim(),
+      final user = await _apiService.login(
+        _emailController.text.trim(),
         _passwordController.text,
       );
+      await AuthSessionStorage.saveUser(user);
 
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
         SlideFadeRoute(
           page: HomeScreen(
-            userId: userId,
-            userName: _usernameController.text.trim(),
+            userId: user.id,
+            userName: user.name,
           ),
           direction: SlideDirection.up,
         ),
@@ -208,16 +210,26 @@ class _LoginScreenState extends State<LoginScreen>
               ),
               const SizedBox(height: AppSpacing.xl),
 
-              // ── Username Field ──
+              // ── Email Field ──
               TextFormField(
-                controller: _usernameController,
+                controller: _emailController,
                 textInputAction: TextInputAction.next,
+                keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
-                  labelText: 'Username',
-                  prefixIcon: Icon(Icons.person_outline_rounded),
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.alternate_email_rounded),
                 ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Username is required' : null,
+                validator: (v) {
+                  final value = v?.trim() ?? '';
+                  if (value.isEmpty) {
+                    return 'Email is required';
+                  }
+                  final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+                  if (!emailRegex.hasMatch(value)) {
+                    return 'Enter a valid email address';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: AppSpacing.md),
 

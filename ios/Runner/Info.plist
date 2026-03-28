@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Attendance uses your location during clock in and clock out when available.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Attendance uses your location during clock actions to record work location context.</string>
 </dict>
 </plist>

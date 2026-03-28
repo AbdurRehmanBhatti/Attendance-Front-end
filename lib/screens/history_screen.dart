@@ -2,17 +2,19 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
 
 import '../config/app_theme.dart';
 import '../models/attendance.dart';
+import '../models/attendance_history.dart';
+import '../screens/login_screen.dart';
 import '../services/api_service.dart';
+import '../services/auth_session_storage.dart';
 import '../widgets/attendance_card.dart';
 import '../widgets/shimmer_list.dart';
 
 class HistoryScreen extends StatefulWidget {
-  final int userId;
-
-  const HistoryScreen({super.key, required this.userId});
+  const HistoryScreen({super.key});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -22,8 +24,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   final _apiService = ApiService();
 
   List<Attendance> _records = [];
+  AttendanceSummaryTotals _totals = AttendanceSummaryTotals.zero;
   bool _isLoading = true;
   String? _error;
+  HistoryTab _selectedTab = HistoryTab.today;
 
   @override
   void initState() {
@@ -37,12 +41,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
       _error = null;
     });
     try {
-      final records = await _apiService.getTodayAttendance(widget.userId);
+      final nowUtc = DateTime.now().toUtc();
+      final range = _selectedTab.toDateRange(nowUtc);
+      final response = await _apiService.getAttendanceHistory(
+        startUtc: range.start,
+        endUtc: range.end,
+      );
+
       if (!mounted) return;
       setState(() {
-        _records = records;
+        _records = response.records;
+        _totals = response.totals;
         _isLoading = false;
       });
+    } on UnauthorizedApiException catch (e) {
+      if (!mounted) return;
+      ApiService.clearSession();
+      await AuthSessionStorage.clear();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -69,13 +92,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Today's Attendance"),
-      ),
+      appBar: AppBar(title: const Text('Attendance History')),
       body: RefreshIndicator(
         color: colors.primary,
         onRefresh: _fetchRecords,
-        child: _buildBody(colors),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.sm,
+              ),
+              child: SegmentedButton<HistoryTab>(
+                segments: const [
+                  ButtonSegment(value: HistoryTab.today, label: Text('Today')),
+                  ButtonSegment(
+                    value: HistoryTab.last7Days,
+                    label: Text('Last 7 Days'),
+                  ),
+                  ButtonSegment(
+                    value: HistoryTab.thisMonth,
+                    label: Text('This Month'),
+                  ),
+                ],
+                selected: {_selectedTab},
+                onSelectionChanged: (selection) {
+                  final tab = selection.first;
+                  if (tab == _selectedTab) return;
+                  setState(() => _selectedTab = tab);
+                  _fetchRecords();
+                },
+                showSelectedIcon: false,
+              ),
+            ),
+            Expanded(child: _buildBody(colors)),
+          ],
+        ),
       ),
     );
   }
@@ -93,22 +147,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     // Empty
     if (_records.isEmpty) {
-      return _buildEmptyState(colors);
+      return _buildEmptyState(colors, _selectedTab.emptyMessage);
     }
 
     // List
-    return _buildList();
+    return _buildList(colors);
   }
 
-  Widget _buildList() {
+  Widget _buildList(ColorScheme colors) {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
         vertical: AppSpacing.md,
       ),
-      itemCount: _records.length,
+      itemCount: _records.length + 1,
       itemBuilder: (context, index) {
-        return AttendanceCard(attendance: _records[index])
+        if (index == 0) {
+          return _buildSummaryCard(colors)
+              .animate()
+              .fadeIn(duration: AppDurations.standard)
+              .slideY(
+                begin: 0.1,
+                end: 0,
+                duration: AppDurations.standard,
+                curve: Curves.easeOutCubic,
+              );
+        }
+
+        final record = _records[index - 1];
+        return AttendanceCard(attendance: record)
             .animate()
             .fadeIn(
               duration: AppDurations.standard,
@@ -125,7 +192,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildEmptyState(ColorScheme colors) {
+  Widget _buildSummaryCard(ColorScheme colors) {
+    final textTheme = Theme.of(context).textTheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${DateFormat.yMMMM().format(DateTime.now())} Summary',
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Monthly: ${_formatHours(_totals.monthlyHours)}  |  Weekly: ${_formatHours(_totals.weeklyHours)}  |  Daily: ${_formatHours(_totals.dailyHours)}',
+              style: textTheme.bodyMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ColorScheme colors, String message) {
     final textTheme = Theme.of(context).textTheme;
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -134,37 +229,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
           child: SizedBox(
             height: constraints.maxHeight,
             child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.event_busy_rounded,
-                    size: 80,
-                    color: colors.onSurfaceVariant.withValues(alpha: 0.4),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'No attendance records today',
-                    style: textTheme.titleMedium?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'Pull down to refresh',
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
-              )
-                  .animate()
-                  .fadeIn(duration: AppDurations.emphasis)
-                  .scale(
-                    begin: const Offset(0.9, 0.9),
-                    end: const Offset(1, 1),
-                    duration: AppDurations.emphasis,
-                  ),
+              child:
+                  Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.event_busy_rounded,
+                            size: 80,
+                            color: colors.onSurfaceVariant.withValues(
+                              alpha: 0.4,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            message,
+                            style: textTheme.titleMedium?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Pull down to refresh',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant.withValues(
+                                alpha: 0.6,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                      .animate()
+                      .fadeIn(duration: AppDurations.emphasis)
+                      .scale(
+                        begin: const Offset(0.9, 0.9),
+                        end: const Offset(1, 1),
+                        duration: AppDurations.emphasis,
+                      ),
             ),
           ),
         );
@@ -210,5 +310,48 @@ class _HistoryScreenState extends State<HistoryScreen> {
         );
       },
     );
+  }
+
+  String _formatHours(double hours) {
+    final duration = Duration(minutes: (hours * 60).round());
+    final h = duration.inHours;
+    final m = duration.inMinutes.remainder(60);
+    if (h > 0) return '${h}h ${m}m';
+    return '${m}m';
+  }
+}
+
+enum HistoryTab { today, last7Days, thisMonth }
+
+extension on HistoryTab {
+  ({DateTime start, DateTime end}) toDateRange(DateTime nowUtc) {
+    final todayStart = DateTime.utc(nowUtc.year, nowUtc.month, nowUtc.day);
+    switch (this) {
+      case HistoryTab.today:
+        return (
+          start: todayStart,
+          end: todayStart.add(const Duration(days: 1)),
+        );
+      case HistoryTab.last7Days:
+        final start = todayStart.subtract(const Duration(days: 6));
+        return (start: start, end: todayStart.add(const Duration(days: 1)));
+      case HistoryTab.thisMonth:
+        final start = DateTime.utc(nowUtc.year, nowUtc.month, 1);
+        return (
+          start: start,
+          end: DateTime.utc(nowUtc.year, nowUtc.month + 1, 1),
+        );
+    }
+  }
+
+  String get emptyMessage {
+    switch (this) {
+      case HistoryTab.today:
+        return 'No attendance records today';
+      case HistoryTab.last7Days:
+        return 'No attendance records in the last 7 days';
+      case HistoryTab.thisMonth:
+        return 'No attendance records this month';
+    }
   }
 }
