@@ -20,9 +20,15 @@ import '../widgets/status_indicator.dart';
 
 class HomeScreen extends StatefulWidget {
   final int userId;
+  final int companyId;
   final String userName;
 
-  const HomeScreen({super.key, required this.userId, required this.userName});
+  const HomeScreen({
+    super.key,
+    required this.userId,
+    required this.companyId,
+    required this.userName,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -397,6 +403,13 @@ class _HomeScreenState extends State<HomeScreen> {
               style: textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: colors.onSurface,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Company ${widget.companyId}',
+              style: textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),

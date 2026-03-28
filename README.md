@@ -1,16 +1,39 @@
-# attendance_app
+# Attendance Front-end (Mobile)
 
-A new Flutter project.
+Employee-focused Flutter app for attendance clock-in/clock-out and history.
 
-## Getting Started
+## Multi-Company Mobile Phases
 
-This project is a starting point for a Flutter application.
+### Phase 1 (Completed)
+- Mobile auth/session now stores and restores `companyId` and `roles` from backend login response.
+- App enforces employee-only access for mobile usage.
+- Admin accounts are blocked with a clear message to use the admin web console.
 
-A few resources to get you started if this is your first Flutter project:
+### Phase 2 (Completed)
+- API base URL is now environment-configurable via `--dart-define`.
+- Default is `http://localhost:5054` when no override is provided.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Run With API URL
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Use `--dart-define` to target the backend environment you want.
+
+Example:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://localhost:5054
+```
+
+LAN example:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://192.168.100.46:5054
+```
+
+## Notes
+
+- Login endpoint: `/api/auth/login`
+- Employee app remains employee-focused by design; admins should use the separate `attendance-admin-web` project.
+
+## Maintenance
+
+- Backend change playbook for mobile: [MOBILE_BACKEND_SYNC_GUIDE.md](MOBILE_BACKEND_SYNC_GUIDE.md)

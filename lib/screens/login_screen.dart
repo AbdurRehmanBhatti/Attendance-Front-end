@@ -67,6 +67,19 @@ class _LoginScreenState extends State<LoginScreen>
         _emailController.text.trim(),
         _passwordController.text,
       );
+
+      if (!user.isEmployee) {
+        ApiService.clearSession();
+        await AuthSessionStorage.clear();
+
+        if (!mounted) return;
+        _shakeController.forward(from: 0);
+        _showErrorSnackBar(
+          'This mobile app is for Employee accounts only. Use the admin web console for Admin access.',
+        );
+        return;
+      }
+
       await AuthSessionStorage.saveUser(user);
 
       if (!mounted) return;
@@ -75,6 +88,7 @@ class _LoginScreenState extends State<LoginScreen>
         SlideFadeRoute(
           page: HomeScreen(
             userId: user.id,
+            companyId: user.companyId,
             userName: user.name,
           ),
           direction: SlideDirection.up,

@@ -39,10 +39,13 @@ class _AttendanceAppState extends State<AttendanceApp> {
   Future<void> _restoreSession() async {
     final user = await AuthSessionStorage.loadUser();
 
-    if (user != null && user.token.trim().isNotEmpty) {
+    if (user != null && user.token.trim().isNotEmpty && user.isEmployee) {
       ApiService.restoreSession(user);
       _initialRoute = AttendanceApp.homeRoute;
       _initialArgs = _homeArgsFromUser(user);
+    } else if (user != null && !user.isEmployee) {
+      await AuthSessionStorage.clear();
+      ApiService.clearSession();
     }
 
     if (!mounted) return;
@@ -52,6 +55,7 @@ class _AttendanceAppState extends State<AttendanceApp> {
   Map<String, dynamic> _homeArgsFromUser(User user) {
     return {
       'userId': user.id,
+      'companyId': user.companyId,
       'userName': user.name,
     };
   }
@@ -61,9 +65,14 @@ class _AttendanceAppState extends State<AttendanceApp> {
     final currentUser = ApiService.currentUser;
 
     final userId = (args?['userId'] as int?) ?? currentUser?.id;
+    final companyId = (args?['companyId'] as int?) ?? currentUser?.companyId;
     final userName = (args?['userName'] as String?) ?? currentUser?.name;
 
-    if (userId == null || userName == null || userName.trim().isEmpty) {
+    if (userId == null ||
+        companyId == null ||
+        userName == null ||
+        userName.trim().isEmpty ||
+        (currentUser != null && !currentUser.isEmployee)) {
       return SlideFadeRoute(
         page: const LoginScreen(),
         direction: direction,
@@ -71,7 +80,7 @@ class _AttendanceAppState extends State<AttendanceApp> {
     }
 
     return SlideFadeRoute(
-      page: HomeScreen(userId: userId, userName: userName),
+      page: HomeScreen(userId: userId, companyId: companyId, userName: userName),
       direction: direction,
     );
   }
@@ -81,13 +90,18 @@ class _AttendanceAppState extends State<AttendanceApp> {
     final currentUser = ApiService.currentUser;
 
     final userId = (args?['userId'] as int?) ?? currentUser?.id;
+    final companyId = (args?['companyId'] as int?) ?? currentUser?.companyId;
     final userName = (args?['userName'] as String?) ?? currentUser?.name;
 
-    if (userId == null || userName == null || userName.trim().isEmpty) {
+    if (userId == null ||
+        companyId == null ||
+        userName == null ||
+        userName.trim().isEmpty ||
+        (currentUser != null && !currentUser.isEmployee)) {
       return const LoginScreen();
     }
 
-    return HomeScreen(userId: userId, userName: userName);
+    return HomeScreen(userId: userId, companyId: companyId, userName: userName);
   }
 
   @override

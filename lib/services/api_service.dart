@@ -173,10 +173,7 @@ class ApiService {
       return {};
     }
 
-    return {
-      'latitude': latitude,
-      'longitude': longitude,
-    };
+    return {'latitude': latitude, 'longitude': longitude};
   }
 
   String _parseError(String body, {String fallback = 'Request failed.'}) {
