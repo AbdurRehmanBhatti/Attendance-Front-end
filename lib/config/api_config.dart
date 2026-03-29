@@ -3,6 +3,7 @@ class ApiConfig {
 
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.100.46:5054',
+    // defaultValue: 'http://192.168.100.46:5054',
+    defaultValue: 'http://abdurrehman1a3-001-site1.jtempurl.com',
   );
 }
