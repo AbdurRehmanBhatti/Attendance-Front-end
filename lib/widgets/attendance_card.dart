@@ -25,9 +25,11 @@ class _AttendanceCardState extends State<AttendanceCard> {
 
   String _fmtDuration(Duration? d) {
     if (d == null) return '--';
-    final h = d.inHours;
+    final days = d.inDays;
+    final h = d.inHours.remainder(24);
     final m = d.inMinutes.remainder(60);
-    if (h > 0) return '${h}h ${m}m';
+    if (days > 0) return '${days}d ${h}h ${m}m';
+    if (d.inHours > 0) return '${d.inHours}h ${m}m';
     return '${m}m';
   }
 

@@ -22,12 +22,14 @@ import '../widgets/status_indicator.dart';
 class HomeScreen extends StatefulWidget {
   final int userId;
   final int companyId;
+  final String companyName;
   final String userName;
 
   const HomeScreen({
     super.key,
     required this.userId,
     required this.companyId,
+    required this.companyName,
     required this.userName,
   });
 
@@ -611,7 +613,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Company ${widget.companyId}',
+              widget.companyName,
               style: textTheme.bodySmall?.copyWith(
                 color: colors.onSurfaceVariant,
               ),

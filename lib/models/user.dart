@@ -1,6 +1,7 @@
 class User {
   final int id;
   final int companyId;
+  final String companyName;
   final String name;
   final String email;
   final String token;
@@ -9,6 +10,7 @@ class User {
   User({
     required this.id,
     required this.companyId,
+    required this.companyName,
     required this.name,
     required this.email,
     required this.token,
@@ -24,6 +26,8 @@ class User {
   factory User.fromJson(Map<String, dynamic> json) {
     final userIdValue = json['userId'] ?? json['id'];
     final companyIdValue = json['companyId'];
+    final companyId = companyIdValue as int;
+    final companyNameValue = json['companyName'];
     final rolesValue = json['roles'];
 
     final roles = rolesValue is List
@@ -32,7 +36,10 @@ class User {
 
     return User(
       id: userIdValue as int,
-      companyId: companyIdValue as int,
+      companyId: companyId,
+        companyName: (companyNameValue is String && companyNameValue.trim().isNotEmpty)
+          ? companyNameValue
+        : 'Company $companyId',
       name: json['name'] as String,
       email: json['email'] as String,
       token: json['token'] as String,
@@ -44,6 +51,7 @@ class User {
     return {
       'userId': id,
       'companyId': companyId,
+      'companyName': companyName,
       'name': name,
       'email': email,
       'token': token,

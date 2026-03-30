@@ -89,6 +89,7 @@ class _LoginScreenState extends State<LoginScreen>
           page: HomeScreen(
             userId: user.id,
             companyId: user.companyId,
+            companyName: user.companyName,
             userName: user.name,
           ),
           direction: SlideDirection.up,

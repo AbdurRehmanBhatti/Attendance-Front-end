@@ -314,9 +314,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   String _formatHours(double hours) {
     final duration = Duration(minutes: (hours * 60).round());
-    final h = duration.inHours;
+    final days = duration.inDays;
+    final h = duration.inHours.remainder(24);
     final m = duration.inMinutes.remainder(60);
-    if (h > 0) return '${h}h ${m}m';
+    if (days > 0) return '${days}d ${h}h ${m}m';
+    if (duration.inHours > 0) return '${duration.inHours}h ${m}m';
     return '${m}m';
   }
 }

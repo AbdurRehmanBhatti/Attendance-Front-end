@@ -56,6 +56,7 @@ class _AttendanceAppState extends State<AttendanceApp> {
     return {
       'userId': user.id,
       'companyId': user.companyId,
+      'companyName': user.companyName,
       'userName': user.name,
     };
   }
@@ -66,10 +67,13 @@ class _AttendanceAppState extends State<AttendanceApp> {
 
     final userId = (args?['userId'] as int?) ?? currentUser?.id;
     final companyId = (args?['companyId'] as int?) ?? currentUser?.companyId;
+    final companyName = (args?['companyName'] as String?) ?? currentUser?.companyName;
     final userName = (args?['userName'] as String?) ?? currentUser?.name;
 
     if (userId == null ||
         companyId == null ||
+      companyName == null ||
+      companyName.trim().isEmpty ||
         userName == null ||
         userName.trim().isEmpty ||
         (currentUser != null && !currentUser.isEmployee)) {
@@ -80,7 +84,12 @@ class _AttendanceAppState extends State<AttendanceApp> {
     }
 
     return SlideFadeRoute(
-      page: HomeScreen(userId: userId, companyId: companyId, userName: userName),
+      page: HomeScreen(
+        userId: userId,
+        companyId: companyId,
+        companyName: companyName,
+        userName: userName,
+      ),
       direction: direction,
     );
   }
@@ -91,17 +100,25 @@ class _AttendanceAppState extends State<AttendanceApp> {
 
     final userId = (args?['userId'] as int?) ?? currentUser?.id;
     final companyId = (args?['companyId'] as int?) ?? currentUser?.companyId;
+    final companyName = (args?['companyName'] as String?) ?? currentUser?.companyName;
     final userName = (args?['userName'] as String?) ?? currentUser?.name;
 
     if (userId == null ||
         companyId == null ||
+        companyName == null ||
+        companyName.trim().isEmpty ||
         userName == null ||
         userName.trim().isEmpty ||
         (currentUser != null && !currentUser.isEmployee)) {
       return const LoginScreen();
     }
 
-    return HomeScreen(userId: userId, companyId: companyId, userName: userName);
+    return HomeScreen(
+      userId: userId,
+      companyId: companyId,
+      companyName: companyName,
+      userName: userName,
+    );
   }
 
   @override

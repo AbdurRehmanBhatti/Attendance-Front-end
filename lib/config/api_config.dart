@@ -4,6 +4,6 @@ class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     // defaultValue: 'http://192.168.100.46:5054',
-    defaultValue: 'http://abdurrehman1a3-001-site1.jtempurl.com',
+    defaultValue: 'https://attendance-backend-ahcgbkb8hafeg9ep.centralus-01.azurewebsites.net',
   );
 }
