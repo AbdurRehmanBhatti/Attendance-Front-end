@@ -7,6 +7,7 @@ import '../config/api_config.dart';
 import '../models/attendance.dart';
 import '../models/attendance_history.dart';
 import '../models/user.dart';
+import 'auth_session_storage.dart';
 
 class ApiService {
   static const _timeout = Duration(seconds: 15);
@@ -17,9 +18,12 @@ class ApiService {
 
   static String? _authToken;
   static User? _currentUser;
+  static Future<bool>? _refreshInFlight;
 
   static String? get authToken => _authToken;
   static User? get currentUser => _currentUser;
+  static bool get isPasswordChangeRequired =>
+      _currentUser?.requirePasswordChangeOnNextLogin ?? false;
   static bool get isAuthenticated =>
       _authToken != null && _authToken!.trim().isNotEmpty;
 
@@ -54,18 +58,131 @@ class ApiService {
     return user;
   }
 
-  // POST /api/attendance/in
-  Future<Attendance> clockIn({double? latitude, double? longitude}) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}/api/attendance/in');
+  // POST /api/auth/change-password
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/auth/change-password');
+    await _sendAuthenticatedRequest(
+      (headers) => http
+          .post(
+            uri,
+            headers: headers,
+            body: jsonEncode({
+              'currentPassword': currentPassword,
+              'newPassword': newPassword,
+            }),
+          )
+          .timeout(_timeout),
+    );
+  }
+
+  // POST /api/auth/logout-all
+  Future<void> logoutAll() async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/auth/logout-all');
+    await _sendAuthenticatedRequest(
+      (headers) => http.post(uri, headers: headers).timeout(_timeout),
+    );
+  }
+
+  // POST /api/auth/forgot-password
+  Future<String> forgotPassword(String email) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/auth/forgot-password');
     final response = await http
         .post(
           uri,
-          headers: _authHeaders(),
-          body: jsonEncode(_gpsPayload(latitude, longitude)),
+          headers: _baseHeaders,
+          body: jsonEncode({'email': email.trim()}),
         )
         .timeout(_timeout);
 
     _throwIfRequestFailed(response);
+
+    try {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final message = body['message']?.toString();
+      if (message != null && message.trim().isNotEmpty) {
+        return message;
+      }
+    } catch (_) {}
+
+    return 'If the email exists in our system, a password reset link has been generated.';
+  }
+
+  // POST /api/auth/reset-password
+  Future<void> resetPassword({
+    required int userId,
+    required String token,
+    required String newPassword,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/auth/reset-password');
+    final response = await http
+        .post(
+          uri,
+          headers: _baseHeaders,
+          body: jsonEncode({
+            'userId': userId,
+            'token': token,
+            'newPassword': newPassword,
+          }),
+        )
+        .timeout(_timeout);
+
+    _throwIfRequestFailed(response);
+  }
+
+  // POST /api/auth/refresh-token
+  Future<RefreshTokenResponse> refreshToken() async {
+    final user = _currentUser;
+    if (user == null || user.refreshToken.trim().isEmpty) {
+      throw UnauthorizedApiException(
+        HttpStatus.unauthorized,
+        'Session expired. Please sign in again.',
+      );
+    }
+
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/auth/refresh-token');
+    final request = RefreshTokenRequest(refreshToken: user.refreshToken);
+
+    final response = await http
+        .post(
+          uri,
+          headers: _baseHeaders,
+          body: jsonEncode(request.toJson()),
+        )
+        .timeout(_timeout);
+
+    _throwIfRequestFailed(response);
+
+    final refreshed = RefreshTokenResponse.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+
+    final updatedUser = user.copyWith(
+      token: refreshed.token,
+      accessTokenExpiresAtUtc: refreshed.accessTokenExpiresAtUtc,
+      refreshToken: refreshed.refreshToken,
+      refreshTokenExpiresAtUtc: refreshed.refreshTokenExpiresAtUtc,
+    );
+
+    restoreSession(updatedUser);
+    await AuthSessionStorage.saveUser(updatedUser);
+    return refreshed;
+  }
+
+  // POST /api/attendance/in
+  Future<Attendance> clockIn({double? latitude, double? longitude}) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/attendance/in');
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http
+          .post(
+            uri,
+            headers: headers,
+            body: jsonEncode(_gpsPayload(latitude, longitude)),
+          )
+          .timeout(_timeout),
+    );
 
     return Attendance.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
@@ -75,15 +192,15 @@ class ApiService {
   // POST /api/attendance/out
   Future<Attendance> clockOut({double? latitude, double? longitude}) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/attendance/out');
-    final response = await http
-        .post(
-          uri,
-          headers: _authHeaders(),
-          body: jsonEncode(_gpsPayload(latitude, longitude)),
-        )
-        .timeout(_timeout);
-
-    _throwIfRequestFailed(response);
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http
+          .post(
+            uri,
+            headers: headers,
+            body: jsonEncode(_gpsPayload(latitude, longitude)),
+          )
+          .timeout(_timeout),
+    );
 
     return Attendance.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
@@ -103,11 +220,9 @@ class ApiService {
           },
         );
 
-    final response = await http
-        .get(uri, headers: _authHeaders())
-        .timeout(_timeout);
-
-    _throwIfRequestFailed(response);
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http.get(uri, headers: headers).timeout(_timeout),
+    );
 
     return AttendanceHistoryResponse.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
@@ -117,11 +232,9 @@ class ApiService {
   // GET /api/attendance/summary
   Future<AttendanceSummaryTotals> getAttendanceSummary() async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/attendance/summary');
-    final response = await http
-        .get(uri, headers: _authHeaders())
-        .timeout(_timeout);
-
-    _throwIfRequestFailed(response);
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http.get(uri, headers: headers).timeout(_timeout),
+    );
 
     return AttendanceSummaryTotals.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
@@ -151,8 +264,81 @@ class ApiService {
     };
   }
 
+  Future<http.Response> _sendAuthenticatedRequest(
+    Future<http.Response> Function(Map<String, String> headers) send,
+  ) async {
+    var response = await send(_authHeaders());
+
+    if (response.statusCode == HttpStatus.unauthorized) {
+      final refreshed = await _attemptRefreshToken();
+      if (!refreshed) {
+        clearSession();
+        throw UnauthorizedApiException(
+          HttpStatus.unauthorized,
+          'Session expired. Please sign in again.',
+        );
+      }
+
+      response = await send(_authHeaders());
+    }
+
+    _throwIfRequestFailed(response);
+    return response;
+  }
+
+  Future<bool> _attemptRefreshToken() async {
+    final inFlightRefresh = _refreshInFlight;
+    if (inFlightRefresh != null) {
+      return inFlightRefresh;
+    }
+
+    final refreshFuture = _refreshTokenWithSingleFlight();
+    _refreshInFlight = refreshFuture;
+
+    try {
+      return await refreshFuture;
+    } finally {
+      if (identical(_refreshInFlight, refreshFuture)) {
+        _refreshInFlight = null;
+      }
+    }
+  }
+
+  Future<bool> _refreshTokenWithSingleFlight() async {
+    try {
+      await refreshToken();
+      return true;
+    } on ApiException {
+      clearSession();
+      await AuthSessionStorage.clear();
+      return false;
+    } catch (_) {
+      clearSession();
+      await AuthSessionStorage.clear();
+      return false;
+    }
+  }
+
   void _throwIfRequestFailed(http.Response response) {
     final parsed = _parseErrorPayload(response.body);
+
+    if (response.statusCode == HttpStatus.forbidden &&
+        parsed.code == 'password_change_required') {
+      final user = _currentUser;
+      if (user != null) {
+        _currentUser =
+            user.copyWith(requirePasswordChangeOnNextLogin: true);
+      }
+
+      throw PasswordChangeRequiredApiException(
+        response.statusCode,
+        parsed.message ??
+            'Password change is required before continuing.',
+        code: parsed.code,
+        detail: parsed.detail,
+        metadata: parsed.metadata,
+      );
+    }
 
     if (response.statusCode == HttpStatus.unauthorized) {
       clearSession();
@@ -261,6 +447,16 @@ class UnauthorizedApiException extends ApiException {
   UnauthorizedApiException(super.statusCode, super.message);
 }
 
+class PasswordChangeRequiredApiException extends ApiException {
+  PasswordChangeRequiredApiException(
+    super.statusCode,
+    super.message, {
+    super.code,
+    super.detail,
+    super.metadata,
+  });
+}
+
 class _ParsedApiError {
   final String? message;
   final String? code;
@@ -273,4 +469,43 @@ class _ParsedApiError {
     this.detail,
     this.metadata,
   });
+}
+
+class RefreshTokenRequest {
+  final String refreshToken;
+
+  const RefreshTokenRequest({required this.refreshToken});
+
+  Map<String, dynamic> toJson() {
+    return {
+      'refreshToken': refreshToken,
+    };
+  }
+}
+
+class RefreshTokenResponse {
+  final String token;
+  final DateTime accessTokenExpiresAtUtc;
+  final String refreshToken;
+  final DateTime refreshTokenExpiresAtUtc;
+
+  const RefreshTokenResponse({
+    required this.token,
+    required this.accessTokenExpiresAtUtc,
+    required this.refreshToken,
+    required this.refreshTokenExpiresAtUtc,
+  });
+
+  factory RefreshTokenResponse.fromJson(Map<String, dynamic> json) {
+    return RefreshTokenResponse(
+      token: (json['token'] as String?) ?? '',
+      accessTokenExpiresAtUtc:
+          DateTime.parse((json['accessTokenExpiresAtUtc'] as String?) ?? '')
+              .toUtc(),
+      refreshToken: (json['refreshToken'] as String?) ?? '',
+      refreshTokenExpiresAtUtc:
+          DateTime.parse((json['refreshTokenExpiresAtUtc'] as String?) ?? '')
+              .toUtc(),
+    );
+  }
 }

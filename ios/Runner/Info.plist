@@ -49,5 +49,18 @@
 	<string>Attendance uses your location during clock in and clock out when available.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Attendance uses your location during clock actions to record work location context.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>attendance.password.reset</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>attendanceapp</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

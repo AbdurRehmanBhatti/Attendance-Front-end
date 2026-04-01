@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
+import '../main.dart';
 import '../config/app_theme.dart';
 import '../config/page_transitions.dart';
+import '../screens/change_password_screen.dart';
 import '../screens/home_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_session_storage.dart';
@@ -84,11 +86,29 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (!mounted) return;
 
+      if (user.requirePasswordChangeOnNextLogin) {
+        Navigator.of(context).pushReplacement(
+          SlideFadeRoute(
+            page: const ChangePasswordScreen(),
+            direction: SlideDirection.up,
+          ),
+        );
+        return;
+      }
+
+      if (user.companyId == null) {
+        _shakeController.forward(from: 0);
+        _showErrorSnackBar(
+          'Your account is not assigned to a company. Contact support.',
+        );
+        return;
+      }
+
       Navigator.of(context).pushReplacement(
         SlideFadeRoute(
           page: HomeScreen(
             userId: user.id,
-            companyId: user.companyId,
+            companyId: user.companyId!,
             companyName: user.companyName,
             userName: user.name,
           ),
@@ -269,6 +289,21 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
                 validator: (v) =>
                     (v == null || v.isEmpty) ? 'Password is required' : null,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          Navigator.of(context).pushNamed(
+                            AttendanceApp.forgotPasswordRoute,
+                          );
+                        },
+                  child: const Text('Forgot Password?'),
+                ),
               ),
               const SizedBox(height: AppSpacing.lg),
 

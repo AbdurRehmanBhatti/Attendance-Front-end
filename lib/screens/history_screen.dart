@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../config/app_theme.dart';
 import '../models/attendance.dart';
 import '../models/attendance_history.dart';
+import '../screens/change_password_screen.dart';
 import '../screens/login_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_session_storage.dart';
@@ -32,10 +33,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _enforcePasswordChangeGate();
+    });
     _fetchRecords();
   }
 
+  void _enforcePasswordChangeGate() {
+    final user = ApiService.currentUser;
+    if (user == null || !user.requirePasswordChangeOnNextLogin || !mounted) {
+      return;
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const ChangePasswordScreen()),
+      (route) => false,
+    );
+  }
+
   Future<void> _fetchRecords() async {
+    if (ApiService.isPasswordChangeRequired) {
+      if (mounted) {
+        _enforcePasswordChangeGate();
+      }
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -54,6 +77,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _totals = response.totals;
         _isLoading = false;
       });
+    } on PasswordChangeRequiredApiException {
+      if (!mounted) return;
+      _enforcePasswordChangeGate();
     } on UnauthorizedApiException catch (e) {
       if (!mounted) return;
       ApiService.clearSession();

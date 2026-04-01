@@ -11,6 +11,7 @@ import '../config/app_theme.dart';
 import '../config/page_transitions.dart';
 import '../models/attendance.dart';
 import '../models/attendance_history.dart';
+import '../screens/change_password_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/login_screen.dart';
 import '../services/api_service.dart';
@@ -52,7 +53,25 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _enforcePasswordChangeGate();
+    });
     _fetchTodayStatus();
+  }
+
+  void _enforcePasswordChangeGate() {
+    final user = ApiService.currentUser;
+    if (user == null || !user.requirePasswordChangeOnNextLogin || !mounted) {
+      return;
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      SlideFadeRoute(
+        page: const ChangePasswordScreen(),
+        direction: SlideDirection.up,
+      ),
+      (route) => false,
+    );
   }
 
   @override
@@ -115,6 +134,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchTodayStatus() async {
+    if (ApiService.isPasswordChangeRequired) {
+      if (mounted) {
+        _enforcePasswordChangeGate();
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final nowUtc = DateTime.now().toUtc();
@@ -131,6 +157,9 @@ class _HomeScreenState extends State<HomeScreen> {
         _totals = response.totals;
         _isLoading = false;
       });
+    } on PasswordChangeRequiredApiException {
+      if (!mounted) return;
+      _enforcePasswordChangeGate();
     } on UnauthorizedApiException catch (e) {
       if (!mounted) return;
       await _handleUnauthorized(e.message);
@@ -158,6 +187,10 @@ class _HomeScreenState extends State<HomeScreen> {
         longitude: location.longitude,
       );
       await _fetchTodayStatus();
+    } on PasswordChangeRequiredApiException {
+      if (!mounted) return;
+      _enforcePasswordChangeGate();
+      rethrow;
     } on UnauthorizedApiException catch (e) {
       if (!mounted) return;
       await _handleUnauthorized(e.message);
@@ -184,6 +217,10 @@ class _HomeScreenState extends State<HomeScreen> {
         longitude: location.longitude,
       );
       await _fetchTodayStatus();
+    } on PasswordChangeRequiredApiException {
+      if (!mounted) return;
+      _enforcePasswordChangeGate();
+      rethrow;
     } on UnauthorizedApiException catch (e) {
       if (!mounted) return;
       await _handleUnauthorized(e.message);
@@ -399,6 +436,67 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _navigateToChangePassword() async {
+    await Navigator.of(context).push(
+      SlideFadeRoute(
+        page: const ChangePasswordScreen(),
+        direction: SlideDirection.up,
+      ),
+    );
+  }
+
+  Future<void> _handleLogoutAllDevices() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Log out all devices'),
+          content: const Text(
+            'This will revoke all active sessions. You will need to sign in again on every device.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Log out all'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    try {
+      await _apiService.logoutAll();
+      await AuthSessionStorage.clear();
+      ApiService.clearSession();
+
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        SlideFadeRoute(page: const LoginScreen(), direction: SlideDirection.down),
+        (route) => false,
+      );
+    } on PasswordChangeRequiredApiException {
+      if (!mounted) return;
+      _enforcePasswordChangeGate();
+    } on UnauthorizedApiException catch (e) {
+      if (!mounted) return;
+      await _handleUnauthorized(e.message);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showError('Unable to log out all devices right now.');
+    }
+  }
+
   String _buildOutsideAreaMessage(ApiException error) {
     final metadata = error.metadata;
     if (metadata == null) {
@@ -589,6 +687,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: _navigateToHistory,
                   icon: const Icon(Icons.history_rounded),
                   tooltip: 'History',
+                ),
+                IconButton(
+                  onPressed: _navigateToChangePassword,
+                  icon: const Icon(Icons.password_rounded),
+                  tooltip: 'Change Password',
+                ),
+                IconButton(
+                  onPressed: _handleLogoutAllDevices,
+                  icon: const Icon(Icons.devices_fold_rounded),
+                  tooltip: 'Log Out All Devices',
                 ),
                 IconButton(
                   onPressed: _handleLogout,
