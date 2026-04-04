@@ -1,6 +1,6 @@
 {
-    "name": "attendance_app",
-    "short_name": "attendance_app",
+    "name": "TimeSphere",
+    "short_name": "TimeSphere",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

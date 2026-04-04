@@ -332,7 +332,7 @@ class _AttendanceAppState extends State<AttendanceApp> {
     }
 
     return MaterialApp(
-      title: 'Attendance App',
+      title: 'TimeSphere',
       navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
