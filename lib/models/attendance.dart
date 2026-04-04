@@ -1,6 +1,7 @@
 class Attendance {
   final int id;
   final int userId;
+  final int? officeId;
   final DateTime? clockIn;
   final DateTime? clockOut;
   final double? latitude;
@@ -11,6 +12,7 @@ class Attendance {
   Attendance({
     required this.id,
     required this.userId,
+    this.officeId,
     this.clockIn,
     this.clockOut,
     this.latitude,
@@ -23,6 +25,7 @@ class Attendance {
     return Attendance(
       id: json['attendanceId'] as int,
       userId: json['userId'] as int,
+      officeId: json['officeId'] as int?,
       clockIn: json['clockInTime'] != null
           ? _parseApiUtcDateTime(json['clockInTime'] as String)
           : null,

@@ -425,6 +425,9 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'outside_allowed_area':
         _showError(_buildOutsideAreaMessage(error));
         return;
+      case 'employee_office_not_assigned':
+        _showError('You are not assigned to any office yet. Contact your admin.');
+        return;
       case 'gps_required':
         _showWarning('Location is required for clock in/out. Turn on GPS and retry.');
         return;
@@ -503,9 +506,11 @@ class _HomeScreenState extends State<HomeScreen> {
       return error.message;
     }
 
-    final officeName = metadata['officeName']?.toString();
+    final officeName =
+        metadata['officeName']?.toString() ?? metadata['nearestOfficeName']?.toString();
     final guidance = metadata['guidance']?.toString();
-    final distanceMeters = _toDouble(metadata['distanceMeters']);
+    final distanceMeters =
+        _toDouble(metadata['distanceMeters']) ?? _toDouble(metadata['nearestDistanceMeters']);
     final effectiveRadiusMeters = _toDouble(metadata['effectiveRadiusMeters']);
     final allowedRadiusMeters = _toDouble(metadata['allowedRadiusMeters']);
 
@@ -975,6 +980,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
+                if (att.officeId != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Office ID: ${att.officeId}',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
