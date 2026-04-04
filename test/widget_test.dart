@@ -6,12 +6,15 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 
 import 'package:attendance_app/main.dart';
 
 void main() {
   testWidgets('App renders scaffold', (WidgetTester tester) async {
     await tester.pumpWidget(const AttendanceApp());
-    expect(find.text('Attendance App — Scaffold ready'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.byType(MaterialApp), findsOneWidget);
+    expect(find.byType(Scaffold), findsOneWidget);
   });
 }

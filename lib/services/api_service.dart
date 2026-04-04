@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
+import '../models/account_deletion.dart';
 import '../models/attendance.dart';
 import '../models/attendance_history.dart';
 import '../models/user.dart';
@@ -146,11 +147,7 @@ class ApiService {
     final request = RefreshTokenRequest(refreshToken: user.refreshToken);
 
     final response = await http
-        .post(
-          uri,
-          headers: _baseHeaders,
-          body: jsonEncode(request.toJson()),
-        )
+        .post(uri, headers: _baseHeaders, body: jsonEncode(request.toJson()))
         .timeout(_timeout);
 
     _throwIfRequestFailed(response);
@@ -250,6 +247,55 @@ class ApiService {
     return response.records;
   }
 
+  // POST /api/account-deletion/request-authenticated
+  Future<AccountDeletionRequestResponse> requestAuthenticatedAccountDeletion({
+    String? reason,
+  }) async {
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}/api/account-deletion/request-authenticated',
+    );
+
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http
+          .post(
+            uri,
+            headers: headers,
+            body: jsonEncode({
+              if (reason != null && reason.trim().isNotEmpty)
+                'reason': reason.trim(),
+            }),
+          )
+          .timeout(_timeout),
+    );
+
+    return AccountDeletionRequestResponse.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  // GET /api/account-deletion/my-request-status
+  Future<AccountDeletionMyRequestStatusResponse?>
+  getMyAccountDeletionRequestStatus() async {
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}/api/account-deletion/my-request-status',
+    );
+
+    try {
+      final response = await _sendAuthenticatedRequest(
+        (headers) => http.get(uri, headers: headers).timeout(_timeout),
+      );
+
+      return AccountDeletionMyRequestStatusResponse.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+    } on ApiException catch (error) {
+      if (error.statusCode == HttpStatus.notFound) {
+        return null;
+      }
+      rethrow;
+    }
+  }
+
   Map<String, String> _authHeaders() {
     if (!isAuthenticated) {
       throw UnauthorizedApiException(
@@ -326,14 +372,12 @@ class ApiService {
         parsed.code == 'password_change_required') {
       final user = _currentUser;
       if (user != null) {
-        _currentUser =
-            user.copyWith(requirePasswordChangeOnNextLogin: true);
+        _currentUser = user.copyWith(requirePasswordChangeOnNextLogin: true);
       }
 
       throw PasswordChangeRequiredApiException(
         response.statusCode,
-        parsed.message ??
-            'Password change is required before continuing.',
+        parsed.message ?? 'Password change is required before continuing.',
         code: parsed.code,
         detail: parsed.detail,
         metadata: parsed.metadata,
@@ -367,8 +411,10 @@ class ApiService {
     return {'latitude': latitude, 'longitude': longitude};
   }
 
-  _ParsedApiError _parseErrorPayload(String body,
-      {String fallback = 'Request failed.'}) {
+  _ParsedApiError _parseErrorPayload(
+    String body, {
+    String fallback = 'Request failed.',
+  }) {
     try {
       final json = jsonDecode(body);
       if (json is Map<String, dynamic>) {
@@ -391,12 +437,13 @@ class ApiService {
           }
         }
 
-        final message = (json['message'] ??
-                json['detail'] ??
-                json['error'] ??
-                json['title'] ??
-                fallback)
-            .toString();
+        final message =
+            (json['message'] ??
+                    json['detail'] ??
+                    json['error'] ??
+                    json['title'] ??
+                    fallback)
+                .toString();
 
         return _ParsedApiError(
           message: message,
@@ -463,12 +510,7 @@ class _ParsedApiError {
   final String? detail;
   final Map<String, dynamic>? metadata;
 
-  _ParsedApiError({
-    this.message,
-    this.code,
-    this.detail,
-    this.metadata,
-  });
+  _ParsedApiError({this.message, this.code, this.detail, this.metadata});
 }
 
 class RefreshTokenRequest {
@@ -477,9 +519,7 @@ class RefreshTokenRequest {
   const RefreshTokenRequest({required this.refreshToken});
 
   Map<String, dynamic> toJson() {
-    return {
-      'refreshToken': refreshToken,
-    };
+    return {'refreshToken': refreshToken};
   }
 }
 
@@ -499,13 +539,13 @@ class RefreshTokenResponse {
   factory RefreshTokenResponse.fromJson(Map<String, dynamic> json) {
     return RefreshTokenResponse(
       token: (json['token'] as String?) ?? '',
-      accessTokenExpiresAtUtc:
-          DateTime.parse((json['accessTokenExpiresAtUtc'] as String?) ?? '')
-              .toUtc(),
+      accessTokenExpiresAtUtc: DateTime.parse(
+        (json['accessTokenExpiresAtUtc'] as String?) ?? '',
+      ).toUtc(),
       refreshToken: (json['refreshToken'] as String?) ?? '',
-      refreshTokenExpiresAtUtc:
-          DateTime.parse((json['refreshTokenExpiresAtUtc'] as String?) ?? '')
-              .toUtc(),
+      refreshTokenExpiresAtUtc: DateTime.parse(
+        (json['refreshTokenExpiresAtUtc'] as String?) ?? '',
+      ).toUtc(),
     );
   }
 }

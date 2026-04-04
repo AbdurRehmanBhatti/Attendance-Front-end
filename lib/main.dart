@@ -6,10 +6,12 @@ import 'config/app_theme.dart';
 import 'config/page_transitions.dart';
 import 'models/user.dart';
 import 'screens/change_password_screen.dart';
+import 'screens/delete_account_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/my_account_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_session_storage.dart';
@@ -28,6 +30,8 @@ class AttendanceApp extends StatefulWidget {
   static const String forgotPasswordRoute = '/forgot-password';
   static const String resetPasswordRoute = '/reset-password';
   static const String historyRoute = '/history';
+  static const String myAccountRoute = '/my-account';
+  static const String deleteAccountRoute = '/delete-account';
 
   @override
   State<AttendanceApp> createState() => _AttendanceAppState();
@@ -401,6 +405,18 @@ class _AttendanceAppState extends State<AttendanceApp> {
       case AttendanceApp.historyRoute:
         return SlideFadeRoute(
           page: const HistoryScreen(),
+        );
+
+      case AttendanceApp.myAccountRoute:
+        return SlideFadeRoute(
+          page: const MyAccountScreen(),
+          direction: SlideDirection.up,
+        );
+
+      case AttendanceApp.deleteAccountRoute:
+        return SlideFadeRoute(
+          page: const DeleteAccountScreen(),
+          direction: SlideDirection.up,
         );
 
       default:

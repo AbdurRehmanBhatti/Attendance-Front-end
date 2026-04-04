@@ -11,6 +11,8 @@ import '../config/app_theme.dart';
 import '../config/page_transitions.dart';
 import '../models/attendance.dart';
 import '../models/attendance_history.dart';
+import '../models/account_deletion.dart';
+import '../main.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/login_screen.dart';
@@ -19,6 +21,14 @@ import '../services/auth_session_storage.dart';
 import '../services/location_service.dart';
 import '../widgets/animated_clock_button.dart';
 import '../widgets/status_indicator.dart';
+
+enum _HeaderAction {
+  myAccount,
+  changePassword,
+  deleteAccount,
+  logoutAll,
+  logout,
+}
 
 class HomeScreen extends StatefulWidget {
   final int userId;
@@ -152,6 +162,19 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (!mounted) return;
+
+      final deletionStatus = await _apiService
+          .getMyAccountDeletionRequestStatus();
+      if (!mounted) return;
+
+      final requiresForcedLogout = _requiresDeletionForcedLogout(
+        deletionStatus,
+      );
+      if (requiresForcedLogout) {
+        await _handleDeletionCompletedLogout();
+        return;
+      }
+
       setState(() {
         _applyTodayRecords(response.records);
         _totals = response.totals;
@@ -426,13 +449,19 @@ class _HomeScreenState extends State<HomeScreen> {
         _showError(_buildOutsideAreaMessage(error));
         return;
       case 'employee_office_not_assigned':
-        _showError('You are not assigned to any office yet. Contact your admin.');
+        _showError(
+          'You are not assigned to any office yet. Contact your admin.',
+        );
         return;
       case 'gps_required':
-        _showWarning('Location is required for clock in/out. Turn on GPS and retry.');
+        _showWarning(
+          'Location is required for clock in/out. Turn on GPS and retry.',
+        );
         return;
       case 'office_location_not_configured':
-        _showError('Office geofence is not configured yet. Contact your admin.');
+        _showError(
+          'Office geofence is not configured yet. Contact your admin.',
+        );
         return;
       default:
         _showError(error.message);
@@ -482,7 +511,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
-        SlideFadeRoute(page: const LoginScreen(), direction: SlideDirection.down),
+        SlideFadeRoute(
+          page: const LoginScreen(),
+          direction: SlideDirection.down,
+        ),
         (route) => false,
       );
     } on PasswordChangeRequiredApiException {
@@ -507,10 +539,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final officeName =
-        metadata['officeName']?.toString() ?? metadata['nearestOfficeName']?.toString();
+        metadata['officeName']?.toString() ??
+        metadata['nearestOfficeName']?.toString();
     final guidance = metadata['guidance']?.toString();
     final distanceMeters =
-        _toDouble(metadata['distanceMeters']) ?? _toDouble(metadata['nearestDistanceMeters']);
+        _toDouble(metadata['distanceMeters']) ??
+        _toDouble(metadata['nearestDistanceMeters']);
     final effectiveRadiusMeters = _toDouble(metadata['effectiveRadiusMeters']);
     final allowedRadiusMeters = _toDouble(metadata['allowedRadiusMeters']);
 
@@ -584,6 +618,64 @@ class _HomeScreenState extends State<HomeScreen> {
       SlideFadeRoute(page: const LoginScreen(), direction: SlideDirection.down),
       (route) => false,
     );
+  }
+
+  bool _requiresDeletionForcedLogout(
+    AccountDeletionMyRequestStatusResponse? status,
+  ) {
+    if (status == null) {
+      return false;
+    }
+
+    return status.status == 'Completed';
+  }
+
+  Future<void> _handleDeletionCompletedLogout() async {
+    await AuthSessionStorage.clear();
+    ApiService.clearSession();
+    if (!mounted) return;
+
+    _showWarning(
+      'Your account deletion has been completed. You have been signed out.',
+    );
+    Navigator.of(context).pushAndRemoveUntil(
+      SlideFadeRoute(page: const LoginScreen(), direction: SlideDirection.down),
+      (route) => false,
+    );
+  }
+
+  Future<void> _navigateToDeleteAccount() async {
+    await Navigator.of(context).pushNamed(AttendanceApp.deleteAccountRoute);
+
+    if (!mounted) {
+      return;
+    }
+
+    await _fetchTodayStatus();
+  }
+
+  Future<void> _navigateToMyAccount() async {
+    await Navigator.of(context).pushNamed(AttendanceApp.myAccountRoute);
+  }
+
+  Future<void> _onHeaderActionSelected(_HeaderAction action) async {
+    switch (action) {
+      case _HeaderAction.myAccount:
+        await _navigateToMyAccount();
+        return;
+      case _HeaderAction.changePassword:
+        await _navigateToChangePassword();
+        return;
+      case _HeaderAction.deleteAccount:
+        await _navigateToDeleteAccount();
+        return;
+      case _HeaderAction.logoutAll:
+        await _handleLogoutAllDevices();
+        return;
+      case _HeaderAction.logout:
+        await _handleLogout();
+        return;
+    }
   }
 
   void _navigateToHistory() {
@@ -693,20 +785,34 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.history_rounded),
                   tooltip: 'History',
                 ),
-                IconButton(
-                  onPressed: _navigateToChangePassword,
-                  icon: const Icon(Icons.password_rounded),
-                  tooltip: 'Change Password',
-                ),
-                IconButton(
-                  onPressed: _handleLogoutAllDevices,
-                  icon: const Icon(Icons.devices_fold_rounded),
-                  tooltip: 'Log Out All Devices',
-                ),
-                IconButton(
-                  onPressed: _handleLogout,
-                  icon: const Icon(Icons.logout_rounded),
-                  tooltip: 'Logout',
+                PopupMenuButton<_HeaderAction>(
+                  tooltip: 'More actions',
+                  icon: const Icon(Icons.more_vert_rounded),
+                  onSelected: (action) {
+                    unawaited(_onHeaderActionSelected(action));
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem<_HeaderAction>(
+                      value: _HeaderAction.myAccount,
+                      child: Text('My Account'),
+                    ),
+                    PopupMenuItem<_HeaderAction>(
+                      value: _HeaderAction.changePassword,
+                      child: Text('Change Password'),
+                    ),
+                    PopupMenuItem<_HeaderAction>(
+                      value: _HeaderAction.deleteAccount,
+                      child: Text('Delete Account'),
+                    ),
+                    PopupMenuItem<_HeaderAction>(
+                      value: _HeaderAction.logoutAll,
+                      child: Text('Log Out All Devices'),
+                    ),
+                    PopupMenuItem<_HeaderAction>(
+                      value: _HeaderAction.logout,
+                      child: Text('Logout'),
+                    ),
+                  ],
                 ),
               ],
             ),
