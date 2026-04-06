@@ -6,9 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 import '../config/app_theme.dart';
 import '../config/page_transitions.dart';
+import '../config/prefs_keys.dart';
 import '../models/attendance.dart';
 import '../models/attendance_history.dart';
 import '../models/account_deletion.dart';
@@ -51,6 +54,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _apiService = ApiService();
   final _locationService = LocationService();
+  final GlobalKey _clockActionKey = GlobalKey();
+  final GlobalKey _statusCardKey = GlobalKey();
+  final GlobalKey _historyEntryKey = GlobalKey();
+  final GlobalKey _moreMenuKey = GlobalKey();
 
   bool _isLoading = true;
   bool _isAcquiringLocation = false;
@@ -59,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
   AttendanceSummaryTotals _totals = AttendanceSummaryTotals.zero;
   Attendance? _lastAttendance;
   Timer? _liveTicker;
+  bool _hasScheduledHomeTutorial = false;
 
   @override
   void initState() {
@@ -66,7 +74,177 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _enforcePasswordChangeGate();
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowHomeTutorial();
+    });
     _fetchTodayStatus();
+  }
+
+  Future<void> _checkAndShowHomeTutorial() async {
+    if (_hasScheduledHomeTutorial) {
+      return;
+    }
+
+    var seen = false;
+    var onboardingSeen = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      seen = prefs.getBool(AppPrefsKeys.tutorialHomeV1Seen) ?? false;
+      onboardingSeen = prefs.getBool(AppPrefsKeys.onboardingSeen) ?? false;
+    } catch (_) {
+      seen = false;
+      onboardingSeen = false;
+    }
+
+    if (!mounted || seen || !onboardingSeen) {
+      return;
+    }
+
+    if (_isLoading ||
+        _clockActionKey.currentContext == null ||
+        _statusCardKey.currentContext == null ||
+        _historyEntryKey.currentContext == null ||
+        _moreMenuKey.currentContext == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAndShowHomeTutorial();
+      });
+      return;
+    }
+
+    _hasScheduledHomeTutorial = true;
+    _showHomeTutorial();
+  }
+
+  Future<void> _markHomeTutorialSeen() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(AppPrefsKeys.tutorialHomeV1Seen, true);
+      await prefs.setBool(AppPrefsKeys.tutorialSeen, true);
+    } catch (_) {
+      // Ignore local persistence failures for non-critical tutorial state.
+    }
+  }
+
+  void _showHomeTutorial() {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final shadowColor = isDark
+        ? Colors.black.withValues(alpha: 0.55)
+        : Colors.black87;
+
+    TutorialCoachMark(
+      targets: [
+        TargetFocus(
+          identify: 'home_clock_action_key',
+          keyTarget: _clockActionKey,
+          shape: ShapeLightFocus.RRect,
+          radius: AppRadius.lg,
+          paddingFocus: AppSpacing.sm,
+          contents: [
+            TargetContent(
+              align: ContentAlign.top,
+              child: _TutorialContentCard(
+                title: 'Clock In Here',
+                body:
+                    'Tap this button when you arrive at your workplace to record your attendance.',
+                surfaceColor: colors.surface,
+                textColor: colors.onSurface,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'home_status_card_key',
+          keyTarget: _statusCardKey,
+          shape: ShapeLightFocus.RRect,
+          radius: AppRadius.xl,
+          paddingFocus: AppSpacing.xs,
+          contents: [
+            TargetContent(
+              align: ContentAlign.bottom,
+              child: _TutorialContentCard(
+                title: 'Your Live Status',
+                body:
+                    'This card shows whether you are clocked in and your Today and Week totals.',
+                surfaceColor: colors.surface,
+                textColor: colors.onSurface,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'home_history_entry_key',
+          keyTarget: _historyEntryKey,
+          shape: ShapeLightFocus.RRect,
+          radius: AppRadius.md,
+          paddingFocus: AppSpacing.xs,
+          contents: [
+            TargetContent(
+              align: ContentAlign.top,
+              child: _TutorialContentCard(
+                title: 'View Attendance History',
+                body:
+                    'Open History to check your records, hours, and recent activity.',
+                surfaceColor: colors.surface,
+                textColor: colors.onSurface,
+              ),
+            ),
+          ],
+        ),
+        TargetFocus(
+          identify: 'home_more_menu_key',
+          keyTarget: _moreMenuKey,
+          shape: ShapeLightFocus.Circle,
+          paddingFocus: AppSpacing.sm,
+          contents: [
+            TargetContent(
+              align: ContentAlign.bottom,
+              child: _TutorialContentCard(
+                title: 'Account and Settings',
+                body:
+                    'Manage your account, change password, request deletion, or log out from here.',
+                surfaceColor: colors.surface,
+                textColor: colors.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ],
+      colorShadow: shadowColor,
+      hideSkip: false,
+      textSkip: 'Skip',
+      onFinish: () async {
+        await _markHomeTutorialSeen();
+      },
+      onSkip: () {
+        unawaited(_markHomeTutorialSeen());
+        return true;
+      },
+    ).show(context: context);
+  }
+
+  Future<void> _showLocationGuidanceHintOnce() async {
+    var shouldShow = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seen =
+          prefs.getBool(AppPrefsKeys.locationFailureHintV1Seen) ?? false;
+      if (!seen) {
+        shouldShow = true;
+        await prefs.setBool(AppPrefsKeys.locationFailureHintV1Seen, true);
+      }
+    } catch (_) {
+      shouldShow = false;
+    }
+
+    if (!mounted || !shouldShow) {
+      return;
+    }
+
+    _showWarning(
+      'Location Needed: Clock actions require GPS and location permission. Enable location services and retry.',
+    );
   }
 
   void _enforcePasswordChangeGate() {
@@ -336,6 +514,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<bool> _handleLocationFailure(ClockLocationResult result) async {
+    await _showLocationGuidanceHintOnce();
+
     final reason = result.failureReason;
     final action = await _showLocationRecoveryDialog(reason);
     if (!mounted) return false;
@@ -743,6 +923,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // ── History Link ──
               Center(
                 child: TextButton.icon(
+                  key: _historyEntryKey,
                   onPressed: _navigateToHistory,
                   icon: const Icon(Icons.history_rounded),
                   label: const Text('View Full History'),
@@ -786,6 +967,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   tooltip: 'History',
                 ),
                 PopupMenuButton<_HeaderAction>(
+                  key: _moreMenuKey,
                   tooltip: 'More actions',
                   icon: const Icon(Icons.more_vert_rounded),
                   onSelected: (action) {
@@ -857,6 +1039,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final activeSession = _activeSession;
 
     return ClipRRect(
+          key: _statusCardKey,
           borderRadius: BorderRadius.circular(AppRadius.xl),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -885,7 +1068,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _isClockedIn ? 'Clocked In' : 'Not Clocked In',
+                          _isClockedIn ? 'Clocked In' : 'Not Clocked In Today',
                           style: textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: colors.onPrimaryContainer,
@@ -949,6 +1132,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       children: [
         AnimatedSwitcher(
+          key: _clockActionKey,
           duration: AppDurations.standard,
           switchInCurve: Curves.easeOut,
           switchOutCurve: Curves.easeIn,
@@ -1040,7 +1224,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: AppSpacing.md),
                 Row(
                   children: [
-                    Flexible(
+                    Expanded(
                       child: _timeChip(
                         icon: Icons.login_rounded,
                         label: 'In',
@@ -1051,7 +1235,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
-                    Flexible(
+                    Expanded(
                       child: _timeChip(
                         icon: Icons.logout_rounded,
                         label: 'Out',
@@ -1063,33 +1247,33 @@ class _HomeScreenState extends State<HomeScreen> {
                         textTheme: textTheme,
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Flexible(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.sm,
-                          vertical: AppSpacing.xs,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.tertiaryContainer,
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
-                        ),
-                        child: Text(
-                          _formatDuration(att.duration),
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: colors.onTertiaryContainer,
-                          ),
-                        ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.tertiaryContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Text(
+                      'Duration: ${_formatDuration(att.duration)}',
+                      style: textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colors.onTertiaryContainer,
                       ),
                     ),
-                  ],
+                  ),
                 ),
                 if (att.officeName != null || att.officeId != null) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Office: ${att.officeName ?? att.officeId}',
+                    'Location: ${att.officeName ?? att.officeId}',
                     style: textTheme.bodySmall?.copyWith(
                       color: colors.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
@@ -1113,34 +1297,118 @@ class _HomeScreenState extends State<HomeScreen> {
     required ColorScheme colors,
     required TextTheme textTheme,
   }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: AppSpacing.xs),
-        Flexible(
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.max,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  time,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colors.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TutorialContentCard extends StatelessWidget {
+  final String title;
+  final String body;
+  final Color surfaceColor;
+  final Color textColor;
+
+  const _TutorialContentCard({
+    required this.title,
+    required this.body,
+    required this.surfaceColor,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 300),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: surfaceColor.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: textColor.withValues(alpha: 0.10)),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black54,
+                blurRadius: 14,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.labelSmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
+                title,
+                style: textTheme.titleMedium?.copyWith(
+                      color: textColor,
+                      fontWeight: FontWeight.w700,
+                    ) ??
+                    const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
+              const SizedBox(height: AppSpacing.xs),
               Text(
-                time,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: colors.onSurface,
-                ),
+                body,
+                style: textTheme.bodyMedium?.copyWith(
+                      color: textColor,
+                    ) ??
+                    const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:app_links/app_links.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
 import 'config/app_theme.dart';
 import 'config/page_transitions.dart';
+import 'config/prefs_keys.dart';
 import 'models/user.dart';
 import 'screens/change_password_screen.dart';
 import 'screens/delete_account_screen.dart';
@@ -12,6 +14,7 @@ import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/my_account_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_session_storage.dart';
@@ -44,6 +47,7 @@ class _AttendanceAppState extends State<AttendanceApp> {
   Map<String, dynamic>? _pendingResetArgs;
   Map<String, dynamic>? _lastValidResetArgs;
   bool _isInitializing = true;
+  bool _shouldShowOnboarding = false;
   String _initialRoute = AttendanceApp.loginRoute;
   Map<String, dynamic>? _initialArgs;
 
@@ -209,6 +213,23 @@ class _AttendanceAppState extends State<AttendanceApp> {
   }
 
   Future<void> _restoreSession() async {
+    var onboardingSeen = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      onboardingSeen = prefs.getBool(AppPrefsKeys.onboardingSeen) ?? false;
+    } catch (_) {
+      onboardingSeen = false;
+    }
+
+    if (onboardingSeen == false) {
+      if (!mounted) return;
+      setState(() {
+        _shouldShowOnboarding = true;
+        _isInitializing = false;
+      });
+      return;
+    }
+
     final user = await AuthSessionStorage.loadUser();
 
     if (user != null && user.token.trim().isNotEmpty && user.isEmployee) {
@@ -281,6 +302,10 @@ class _AttendanceAppState extends State<AttendanceApp> {
   }
 
   Widget _buildStartupHome() {
+    if (_shouldShowOnboarding) {
+      return const OnboardingScreen();
+    }
+
     final args = _initialArgs;
     final currentUser = ApiService.currentUser;
 

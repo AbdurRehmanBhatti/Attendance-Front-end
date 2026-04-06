@@ -23,6 +23,9 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   final _apiService = ApiService();
+  final GlobalKey _filtersKey = GlobalKey();
+  final GlobalKey _summaryCardKey = GlobalKey();
+  final GlobalKey _recordsListKey = GlobalKey();
 
   List<Attendance> _records = [];
   AttendanceSummaryTotals _totals = AttendanceSummaryTotals.zero;
@@ -125,6 +128,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Column(
           children: [
             Padding(
+              key: _filtersKey,
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
                 AppSpacing.sm,
@@ -182,6 +186,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Widget _buildList(ColorScheme colors) {
     return ListView.builder(
+      key: _recordsListKey,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
         vertical: AppSpacing.md,
@@ -221,6 +226,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildSummaryCard(ColorScheme colors) {
     final textTheme = Theme.of(context).textTheme;
     return Card(
+      key: _summaryCardKey,
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),

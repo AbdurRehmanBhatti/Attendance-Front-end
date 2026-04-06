@@ -1,7 +1,7 @@
 name: attendance_app
 description: "Attendance tracking app with clock-in/out and history."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.9.0
@@ -14,11 +14,14 @@ dependencies:
   intl: ^0.18.0
   google_fonts: ^6.1.0
   flutter_animate: ^4.3.0
+  flutter_svg: ^2.0.10+1
   shimmer: ^3.0.0
   lottie: ^3.1.0
   flutter_secure_storage: ^9.2.2
   app_links: ^6.4.0
-  shared_preferences: ^2.3.3
+  introduction_screen: ^3.1.14
+  tutorial_coach_mark: ^1.2.11
+  shared_preferences: ^2.2.3
   geolocator: ^13.0.2
 
 dev_dependencies:
@@ -32,6 +35,7 @@ flutter:
 
   assets:
     - assets/lottie/
+    - assets/images/
 
 flutter_launcher_icons:
   android: true

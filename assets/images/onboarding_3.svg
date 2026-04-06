@@ -1,0 +1,75 @@
+<svg viewBox="0 0 260 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="130" cy="115" rx="114" ry="93" fill="#9EF2DC"/>
+  <ellipse cx="60" cy="68" rx="36" ry="30" fill="#C8F7ED" opacity="0.45"/>
+  <ellipse cx="205" cy="168" rx="32" ry="26" fill="#C8F7ED" opacity="0.4"/>
+
+  <rect x="44" y="40" width="172" height="148" rx="14" fill="#FFFFFF" stroke="#E8F4F0" stroke-width="1"/>
+
+  <rect x="44" y="40" width="172" height="36" rx="14" fill="#006D5B"/>
+  <rect x="44" y="58" width="172" height="18" fill="#006D5B"/>
+  <rect x="56" y="50" width="70" height="8" rx="3" fill="#FFFFFF" opacity="0.9"/>
+  <rect x="56" y="62" width="44" height="6" rx="2" fill="#FFFFFF" opacity="0.5"/>
+  <rect x="178" y="50" width="28" height="16" rx="6" fill="#FFFFFF" opacity="0.2"/>
+  <rect x="182" y="54" width="8" height="8" rx="2" fill="#FFFFFF" opacity="0.6"/>
+  <line x1="192" y1="56" x2="200" y2="56" stroke="#FFFFFF" stroke-width="1.5" opacity="0.6" stroke-linecap="round"/>
+  <line x1="192" y1="59" x2="198" y2="59" stroke="#FFFFFF" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+
+  <text x="56" y="92" font-family="sans-serif" font-size="6" fill="#A0B5AE">DATE</text>
+  <text x="112" y="92" font-family="sans-serif" font-size="6" fill="#A0B5AE">IN</text>
+  <text x="148" y="92" font-family="sans-serif" font-size="6" fill="#A0B5AE">OUT</text>
+  <text x="184" y="92" font-family="sans-serif" font-size="6" fill="#A0B5AE">STATUS</text>
+  <line x1="52" y1="95" x2="208" y2="95" stroke="#E8F4F0" stroke-width="1"/>
+
+  <rect x="52" y="95" width="156" height="20" rx="4" fill="#F4FCF9"/>
+  <text x="56" y="108" font-family="sans-serif" font-size="6.5" fill="#3F4945">Mon, 31 Mar</text>
+  <text x="110" y="108" font-family="sans-serif" font-size="6.5" fill="#3F4945">08:58 AM</text>
+  <text x="146" y="108" font-family="sans-serif" font-size="6.5" fill="#3F4945">06:02 PM</text>
+  <circle cx="192" cy="105" r="6" fill="#006D5B" opacity="0.15"/>
+  <path d="M189 105 L191 107 L196 102" stroke="#006D5B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <text x="56" y="130" font-family="sans-serif" font-size="6.5" fill="#3F4945">Tue, 1 Apr</text>
+  <text x="110" y="130" font-family="sans-serif" font-size="6.5" fill="#3F4945">09:15 AM</text>
+  <text x="146" y="130" font-family="sans-serif" font-size="6.5" fill="#3F4945">05:47 PM</text>
+  <circle cx="192" cy="127" r="6" fill="#B85C00" opacity="0.15"/>
+  <path d="M192 124 L192 128" stroke="#B85C00" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="192" cy="130.5" r="0.8" fill="#B85C00"/>
+
+  <rect x="52" y="139" width="156" height="20" rx="4" fill="#F4FCF9"/>
+  <text x="56" y="152" font-family="sans-serif" font-size="6.5" fill="#3F4945">Wed, 2 Apr</text>
+  <text x="110" y="152" font-family="sans-serif" font-size="6.5" fill="#3F4945">08:52 AM</text>
+  <text x="146" y="152" font-family="sans-serif" font-size="6.5" fill="#3F4945">06:10 PM</text>
+  <circle cx="192" cy="149" r="6" fill="#006D5B" opacity="0.15"/>
+  <path d="M189 149 L191 151 L196 146" stroke="#006D5B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <text x="56" y="174" font-family="sans-serif" font-size="6.5" fill="#3F4945">Thu, 3 Apr</text>
+  <text x="110" y="174" font-family="sans-serif" font-size="6.5" fill="#3F4945">08:45 AM</text>
+  <text x="146" y="174" font-family="sans-serif" font-size="6.5" fill="#3F4945">06:00 PM</text>
+  <circle cx="192" cy="171" r="6" fill="#006D5B" opacity="0.15"/>
+  <path d="M189 171 L191 173 L196 168" stroke="#006D5B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <rect x="52" y="187" width="156" height="1" fill="#E8F4F0"/>
+  <rect x="56" y="191" width="32" height="8" rx="3" fill="#006D5B" opacity="0.15"/>
+  <text x="59" y="198" font-family="sans-serif" font-size="6" fill="#006D5B">✓ 3 Present</text>
+  <rect x="96" y="191" width="26" height="8" rx="3" fill="#B85C00" opacity="0.15"/>
+  <text x="99" y="198" font-family="sans-serif" font-size="6" fill="#B85C00">! 1 Late</text>
+
+  <circle cx="204" cy="48" r="20" fill="#9EF2DC"/>
+  <circle cx="204" cy="48" r="16" fill="#006D5B"/>
+  <rect x="196" y="44" width="16" height="14" rx="2" fill="#FFFFFF"/>
+  <rect x="196" y="44" width="16" height="5" rx="2" fill="#FFFFFF" opacity="0.3"/>
+  <line x1="200" y1="41" x2="200" y2="45" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="208" y1="41" x2="208" y2="45" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round"/>
+  <rect x="198.5" y="51" width="3" height="3" rx="0.5" fill="#006D5B" opacity="0.6"/>
+  <rect x="203" y="51" width="3" height="3" rx="0.5" fill="#006D5B" opacity="0.6"/>
+  <rect x="207.5" y="51" width="3" height="3" rx="0.5" fill="#006D5B" opacity="0.6"/>
+  <rect x="198.5" y="55" width="3" height="3" rx="0.5" fill="#006D5B" opacity="0.4"/>
+  <rect x="203" y="55" width="3" height="3" rx="0.5" fill="#006D5B" opacity="0.6"/>
+
+  <circle cx="56" cy="178" r="16" fill="#9EF2DC"/>
+  <circle cx="56" cy="178" r="13" fill="#006D5B"/>
+  <path d="M52 182 C52 178 54 174 56 173 C56 175 57 176.5 59 177 C58 178 57 180 57 182 C57 183 58 184 59 185 C57 185 55 184.5 54 183 C52.5 182 52 182 52 182Z" fill="#FFFFFF" opacity="0.9"/>
+  <path d="M58 175 C59 177 60 178 60 180 C60 182 58.5 184 57 185" stroke="#FFFFFF" stroke-width="1" stroke-linecap="round" fill="none" opacity="0.6"/>
+
+  <path d="M36 100 L37 104 L41 105.5 L37 107 L36 111 L35 107 L31 105.5 L35 104Z" fill="#006D5B" opacity="0.5"/>
+  <path d="M222 100 L223 103 L226 104 L223 105 L222 108 L221 105 L218 104 L221 103Z" fill="#006D5B" opacity="0.5"/>
+</svg>
