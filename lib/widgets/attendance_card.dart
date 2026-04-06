@@ -164,11 +164,11 @@ class _AttendanceCardState extends State<AttendanceCard> {
                         textTheme,
                         colors,
                       ),
-                      if (att.officeId != null) ...[
+                      if (att.officeName != null || att.officeId != null) ...[
                         const SizedBox(height: AppSpacing.sm),
                         _detailRow(
-                          'Office ID',
-                          att.officeId.toString(),
+                          'Office',
+                          att.officeName ?? att.officeId.toString(),
                           Icons.business_rounded,
                           colors.primary,
                           textTheme,

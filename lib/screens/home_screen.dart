@@ -1086,10 +1086,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                if (att.officeId != null) ...[
+                if (att.officeName != null || att.officeId != null) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Office ID: ${att.officeId}',
+                    'Office: ${att.officeName ?? att.officeId}',
                     style: textTheme.bodySmall?.copyWith(
                       color: colors.onSurfaceVariant,
                       fontWeight: FontWeight.w500,

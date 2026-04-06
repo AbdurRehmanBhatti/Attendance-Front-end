@@ -2,6 +2,7 @@ class Attendance {
   final int id;
   final int userId;
   final int? officeId;
+  final String? officeName;
   final DateTime? clockIn;
   final DateTime? clockOut;
   final double? latitude;
@@ -13,6 +14,7 @@ class Attendance {
     required this.id,
     required this.userId,
     this.officeId,
+    this.officeName,
     this.clockIn,
     this.clockOut,
     this.latitude,
@@ -26,6 +28,7 @@ class Attendance {
       id: json['attendanceId'] as int,
       userId: json['userId'] as int,
       officeId: json['officeId'] as int?,
+      officeName: _readOfficeName(json),
       clockIn: json['clockInTime'] != null
           ? _parseApiUtcDateTime(json['clockInTime'] as String)
           : null,
@@ -50,6 +53,22 @@ class Attendance {
 
     final normalized = hasTimezone ? raw : '${raw}Z';
     return DateTime.parse(normalized).toUtc();
+  }
+
+  static String? _readOfficeName(Map<String, dynamic> json) {
+    final direct = json['officeName']?.toString().trim();
+    if (direct != null && direct.isNotEmpty) return direct;
+
+    final alternate = json['nearestOfficeName']?.toString().trim();
+    if (alternate != null && alternate.isNotEmpty) return alternate;
+
+    final office = json['office'];
+    if (office is Map<String, dynamic>) {
+      final nested = office['name']?.toString().trim();
+      if (nested != null && nested.isNotEmpty) return nested;
+    }
+
+    return null;
   }
 
   bool get isClockedIn => clockIn != null && clockOut == null;
