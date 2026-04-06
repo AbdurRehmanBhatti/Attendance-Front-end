@@ -1,5 +1,19 @@
 # Play Store Release Notes
 
+## Version 1.0.1
+
+This update improves first-time experience and attendance readability:
+
+- Added a new onboarding flow for first-time users
+- Added guided Home screen walkthrough for key actions
+- Improved dark mode support for onboarding and tutorial overlays
+- Fixed Last Attendance time display overlap/concatenation issues
+- General UI polish and stability improvements
+
+If you want a shorter Play Console version, use this text:
+
+"Added first-time onboarding and Home walkthrough, improved dark mode visuals, and fixed Last Attendance time display issues."
+
 ## Version 1.0.0
 
 TimeSphere is now available with core attendance features:
