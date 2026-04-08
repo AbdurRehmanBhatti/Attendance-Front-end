@@ -247,13 +247,9 @@ class ApiService {
     return response.records;
   }
 
-  // POST /api/account-deletion/request-authenticated
-  Future<AccountDeletionRequestResponse> requestAuthenticatedAccountDeletion({
-    String? reason,
-  }) async {
-    final uri = Uri.parse(
-      '${ApiConfig.baseUrl}/api/account-deletion/request-authenticated',
-    );
+  // POST /api/me/delete-account
+  Future<SelfDeleteAccountResponse> deleteMyAccount({String? reason}) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/me/delete-account');
 
     final response = await _sendAuthenticatedRequest(
       (headers) => http
@@ -268,32 +264,9 @@ class ApiService {
           .timeout(_timeout),
     );
 
-    return AccountDeletionRequestResponse.fromJson(
+    return SelfDeleteAccountResponse.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
     );
-  }
-
-  // GET /api/account-deletion/my-request-status
-  Future<AccountDeletionMyRequestStatusResponse?>
-  getMyAccountDeletionRequestStatus() async {
-    final uri = Uri.parse(
-      '${ApiConfig.baseUrl}/api/account-deletion/my-request-status',
-    );
-
-    try {
-      final response = await _sendAuthenticatedRequest(
-        (headers) => http.get(uri, headers: headers).timeout(_timeout),
-      );
-
-      return AccountDeletionMyRequestStatusResponse.fromJson(
-        jsonDecode(response.body) as Map<String, dynamic>,
-      );
-    } on ApiException catch (error) {
-      if (error.statusCode == HttpStatus.notFound) {
-        return null;
-      }
-      rethrow;
-    }
   }
 
   Map<String, String> _authHeaders() {

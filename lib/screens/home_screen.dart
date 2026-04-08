@@ -14,7 +14,6 @@ import '../config/page_transitions.dart';
 import '../config/prefs_keys.dart';
 import '../models/attendance.dart';
 import '../models/attendance_history.dart';
-import '../models/account_deletion.dart';
 import '../main.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/history_screen.dart';
@@ -340,18 +339,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (!mounted) return;
-
-      final deletionStatus = await _apiService
-          .getMyAccountDeletionRequestStatus();
-      if (!mounted) return;
-
-      final requiresForcedLogout = _requiresDeletionForcedLogout(
-        deletionStatus,
-      );
-      if (requiresForcedLogout) {
-        await _handleDeletionCompletedLogout();
-        return;
-      }
 
       setState(() {
         _applyTodayRecords(response.records);
@@ -794,30 +781,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ApiService.clearSession();
     await AuthSessionStorage.clear();
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      SlideFadeRoute(page: const LoginScreen(), direction: SlideDirection.down),
-      (route) => false,
-    );
-  }
-
-  bool _requiresDeletionForcedLogout(
-    AccountDeletionMyRequestStatusResponse? status,
-  ) {
-    if (status == null) {
-      return false;
-    }
-
-    return status.status == 'Completed';
-  }
-
-  Future<void> _handleDeletionCompletedLogout() async {
-    await AuthSessionStorage.clear();
-    ApiService.clearSession();
-    if (!mounted) return;
-
-    _showWarning(
-      'Your account deletion has been completed. You have been signed out.',
-    );
     Navigator.of(context).pushAndRemoveUntil(
       SlideFadeRoute(page: const LoginScreen(), direction: SlideDirection.down),
       (route) => false,
@@ -1384,7 +1347,8 @@ class _TutorialContentCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: textTheme.titleMedium?.copyWith(
+                style:
+                    textTheme.titleMedium?.copyWith(
                       color: textColor,
                       fontWeight: FontWeight.w700,
                     ) ??
@@ -1397,13 +1361,9 @@ class _TutorialContentCard extends StatelessWidget {
               const SizedBox(height: AppSpacing.xs),
               Text(
                 body,
-                style: textTheme.bodyMedium?.copyWith(
-                      color: textColor,
-                    ) ??
-                    const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
+                style:
+                    textTheme.bodyMedium?.copyWith(color: textColor) ??
+                    const TextStyle(color: Colors.white, fontSize: 14),
               ),
             ],
           ),
