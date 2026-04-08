@@ -62,14 +62,14 @@ android {
                 )
             }
             signingConfig = signingConfigs.getByName("release")
+
+            ndk {
+                // Generate native symbol files for Play Console crash and ANR analysis.
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
         }
     }
 
-    packaging {
-        jniLibs {
-            keepDebugSymbols += "**/*.so"
-        }
-    }
 }
 
 flutter {
