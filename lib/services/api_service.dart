@@ -359,7 +359,10 @@ class ApiService {
   }
 
   void _throwIfRequestFailed(http.Response response) {
-    final parsed = _parseErrorPayload(response.body);
+    final parsed = _parseErrorPayload(
+      response.body,
+      fallback: _statusCodeFallbackMessage(response.statusCode),
+    );
 
     if (response.statusCode == HttpStatus.forbidden &&
         parsed.code == 'password_change_required') {
@@ -408,6 +411,11 @@ class ApiService {
     String body, {
     String fallback = 'Request failed.',
   }) {
+    final trimmedBody = body.trim();
+    if (_looksLikeHtmlDocument(trimmedBody)) {
+      return _ParsedApiError(message: fallback);
+    }
+
     try {
       final json = jsonDecode(body);
       if (json is Map<String, dynamic>) {
@@ -456,11 +464,45 @@ class ApiService {
       );
     }
 
-    if (body.trim().isEmpty) {
+    if (trimmedBody.isEmpty) {
       return _ParsedApiError(message: fallback);
     }
 
-    return _ParsedApiError(message: body);
+    return _ParsedApiError(message: trimmedBody);
+  }
+
+  String _statusCodeFallbackMessage(int statusCode) {
+    switch (statusCode) {
+      case HttpStatus.badRequest:
+        return 'Invalid request. Please check your input and try again.';
+      case HttpStatus.unauthorized:
+        return 'Session expired. Please sign in again.';
+      case HttpStatus.forbidden:
+        return 'You are not allowed to perform this action.';
+      case HttpStatus.notFound:
+        return 'Requested resource was not found.';
+      case HttpStatus.requestTimeout:
+        return 'Request timed out. Please try again.';
+      case HttpStatus.tooManyRequests:
+        return 'Too many requests. Please wait and try again.';
+      default:
+        if (statusCode >= HttpStatus.internalServerError) {
+          return 'Server error. Please try again in a moment.';
+        }
+        return 'Request failed. Please try again.';
+    }
+  }
+
+  bool _looksLikeHtmlDocument(String body) {
+    if (body.isEmpty) {
+      return false;
+    }
+
+    final lower = body.toLowerCase();
+    return lower.startsWith('<!doctype html') ||
+        lower.startsWith('<html') ||
+        lower.contains('<head>') ||
+        lower.contains('<body>');
   }
 
   Map<String, dynamic>? _toStringMap(Object? value) {
