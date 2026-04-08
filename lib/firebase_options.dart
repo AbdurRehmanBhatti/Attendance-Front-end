@@ -42,12 +42,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyDF97WuufWSOcql8paaGQc4ghMauVenQlo',
-    appId: '1:576528444163:web:312b1bec00fa88fa661736',
+    appId: '1:576528444163:web:63182721823a2392661736',
     messagingSenderId: '576528444163',
     projectId: 'time-sphere-51836',
     authDomain: 'time-sphere-51836.firebaseapp.com',
     storageBucket: 'time-sphere-51836.firebasestorage.app',
-    measurementId: 'G-ZTVHJHGWEL',
+    measurementId: 'G-HCHBQVNTHM',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -78,11 +78,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions windows = FirebaseOptions(
     apiKey: 'AIzaSyDF97WuufWSOcql8paaGQc4ghMauVenQlo',
-    appId: '1:576528444163:web:8ad58711bd8d97f3661736',
+    appId: '1:576528444163:web:702c181e41307859661736',
     messagingSenderId: '576528444163',
     projectId: 'time-sphere-51836',
     authDomain: 'time-sphere-51836.firebaseapp.com',
     storageBucket: 'time-sphere-51836.firebasestorage.app',
-    measurementId: 'G-D7JYK1YDEM',
+    measurementId: 'G-MNN2KPC0CR',
   );
+
 }

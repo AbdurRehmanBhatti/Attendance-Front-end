@@ -4,40 +4,40 @@ Recommended tutorial items to show on first login:
 
 1. Primary action: Clock In / Clock Out button  
    Why: this is the core job-to-be-done.  
-   Where: [lib/screens/home_screen.dart](lib/screens/home_screen.dart#L1025)
+   Where: [lib/screens/home_screen.dart](../../lib/screens/home_screen.dart)
 
 2. Status card (current state + total time)  
    Why: users need to understand whether they are currently clocked in and what Today/Week totals mean.  
-   Where: [lib/screens/home_screen.dart](lib/screens/home_screen.dart#L933)
+   Where: [lib/screens/home_screen.dart](../../lib/screens/home_screen.dart)
 
 3. History quick access (top history icon or View Full History button)  
    Why: users often want to verify if their punch was recorded.  
-   Where: [lib/screens/home_screen.dart](lib/screens/home_screen.dart#L860) and [lib/screens/home_screen.dart](lib/screens/home_screen.dart#L822)
+   Where: [lib/screens/home_screen.dart](../../lib/screens/home_screen.dart) and [lib/screens/home_screen.dart](../../lib/screens/home_screen.dart)
 
 4. More actions menu (My Account, Change Password, Delete Account, Logout)  
    Why: this menu contains critical account/session actions.  
-   Where: [lib/screens/home_screen.dart](lib/screens/home_screen.dart#L865)
+   Where: [lib/screens/home_screen.dart](../../lib/screens/home_screen.dart)
 
 5. Pull to refresh hint  
    Why: recovery path for stale state/network glitches.  
-   Where: [lib/screens/home_screen.dart](lib/screens/home_screen.dart#L795)
+   Where: [lib/screens/home_screen.dart](../../lib/screens/home_screen.dart)
 
 Important conditional tutorial hint:
 
 1. Location requirement guidance before first clock attempt  
    Why: clock actions depend on GPS and permission; this is the biggest failure source.  
-   Where: [lib/screens/home_screen.dart](lib/screens/home_screen.dart#L435)
+   Where: [lib/screens/home_screen.dart](../../lib/screens/home_screen.dart)
 
 Optional second tutorial (shown when user opens History first time):
 
 1. Filter tabs: Today / Last 7 Days / This Month  
-   Where: [lib/screens/history_screen.dart](lib/screens/history_screen.dart#L134)
+   Where: [lib/screens/history_screen.dart](../../lib/screens/history_screen.dart)
 
 2. Summary row meaning (Monthly/Weekly/Daily)  
-   Where: [lib/screens/history_screen.dart](lib/screens/history_screen.dart#L221)
+   Where: [lib/screens/history_screen.dart](../../lib/screens/history_screen.dart)
 
 3. Pull to refresh in history  
-   Where: [lib/screens/history_screen.dart](lib/screens/history_screen.dart#L122)
+   Where: [lib/screens/history_screen.dart](../../lib/screens/history_screen.dart)
 
 Suggested scope so users do not get overwhelmed:
 
