@@ -21,6 +21,7 @@ import '../screens/history_screen.dart';
 import '../screens/login_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_session_storage.dart';
+import '../services/crashlytics_service.dart';
 import '../services/location_service.dart';
 import '../widgets/animated_clock_button.dart';
 import '../widgets/status_indicator.dart';
@@ -372,7 +373,15 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       _showError('Connection timed out. Pull to retry.');
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(
+        CrashlyticsService.recordHandledError(
+          error,
+          stackTrace,
+          reason: 'HomeScreen._fetchTodayStatus: unexpected status load error',
+          information: {'screen': 'HomeScreen'},
+        ),
+      );
       if (!mounted) return;
       setState(() => _isLoading = false);
       _showError('Network error. Check your connection.');
@@ -402,7 +411,15 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       _showApiFailure(e);
       rethrow;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(
+        CrashlyticsService.recordHandledError(
+          error,
+          stackTrace,
+          reason: 'HomeScreen._handleClockIn: unexpected clock-in failure',
+          information: {'screen': 'HomeScreen', 'action': 'clock_in'},
+        ),
+      );
       if (!mounted) return;
       _showError('Network error. Check your connection.');
       rethrow;
@@ -432,7 +449,15 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       _showApiFailure(e);
       rethrow;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(
+        CrashlyticsService.recordHandledError(
+          error,
+          stackTrace,
+          reason: 'HomeScreen._handleClockOut: unexpected clock-out failure',
+          information: {'screen': 'HomeScreen', 'action': 'clock_out'},
+        ),
+      );
       if (!mounted) return;
       _showError('Network error. Check your connection.');
       rethrow;
@@ -1384,7 +1409,8 @@ class _TutorialContentCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: textTheme.titleMedium?.copyWith(
+                style:
+                    textTheme.titleMedium?.copyWith(
                       color: textColor,
                       fontWeight: FontWeight.w700,
                     ) ??
@@ -1397,13 +1423,9 @@ class _TutorialContentCard extends StatelessWidget {
               const SizedBox(height: AppSpacing.xs),
               Text(
                 body,
-                style: textTheme.bodyMedium?.copyWith(
-                      color: textColor,
-                    ) ??
-                    const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
+                style:
+                    textTheme.bodyMedium?.copyWith(color: textColor) ??
+                    const TextStyle(color: Colors.white, fontSize: 14),
               ),
             ],
           ),

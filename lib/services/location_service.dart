@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'crashlytics_service.dart';
+
 class ClockLocationResult {
   final double? latitude;
   final double? longitude;
@@ -34,7 +36,8 @@ class LocationService {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       return const ClockLocationResult(
-        warning: 'Location service is off. Enable location to continue clock action.',
+        warning:
+            'Location service is off. Enable location to continue clock action.',
         failureReason: ClockLocationFailureReason.serviceDisabled,
       );
     }
@@ -46,14 +49,16 @@ class LocationService {
 
     if (permission == LocationPermission.denied) {
       return const ClockLocationResult(
-        warning: 'Location permission denied. Allow location to clock in or out.',
+        warning:
+            'Location permission denied. Allow location to clock in or out.',
         failureReason: ClockLocationFailureReason.permissionDenied,
       );
     }
 
     if (permission == LocationPermission.deniedForever) {
       return const ClockLocationResult(
-        warning: 'Location permission is permanently denied. Enable it from app settings.',
+        warning:
+            'Location permission is permanently denied. Enable it from app settings.',
         failureReason: ClockLocationFailureReason.permissionDeniedForever,
       );
     }
@@ -77,11 +82,22 @@ class LocationService {
           return ClockLocationResult(
             latitude: lastKnown.latitude,
             longitude: lastKnown.longitude,
-            warning: 'Using your last known GPS location. If this looks wrong, retry.',
+            warning:
+                'Using your last known GPS location. If this looks wrong, retry.',
           );
         }
-      } catch (e) {
-        debugPrint('LocationService.getLastKnownPosition timeout fallback failed: $e');
+      } catch (error, stackTrace) {
+        unawaited(
+          CrashlyticsService.recordHandledError(
+            error,
+            stackTrace,
+            reason:
+                'LocationService.getClockLocation: lastKnownPosition timeout fallback failed',
+          ),
+        );
+        debugPrint(
+          'LocationService.getLastKnownPosition timeout fallback failed: $error',
+        );
       }
 
       return const ClockLocationResult(
@@ -98,7 +114,15 @@ class LocationService {
         warning: 'Location service is off. Enable location to continue.',
         failureReason: ClockLocationFailureReason.serviceDisabled,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(
+        CrashlyticsService.recordHandledError(
+          error,
+          stackTrace,
+          reason:
+              'LocationService.getClockLocation: unexpected location read error',
+        ),
+      );
       return const ClockLocationResult(
         warning: 'Unable to read location right now. Please retry.',
         failureReason: ClockLocationFailureReason.unavailable,

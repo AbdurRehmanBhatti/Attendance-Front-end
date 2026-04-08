@@ -7,6 +7,7 @@ import '../config/page_transitions.dart';
 import '../screens/login_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_session_storage.dart';
+import '../services/crashlytics_service.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final int? userId;
@@ -73,7 +74,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
       _showSnackBar('Password reset successful. Please sign in.');
       Navigator.of(context).pushAndRemoveUntil(
-        SlideFadeRoute(page: const LoginScreen(), direction: SlideDirection.down),
+        SlideFadeRoute(
+          page: const LoginScreen(),
+          direction: SlideDirection.down,
+        ),
         (route) => false,
       );
     } on ApiException catch (e) {
@@ -86,7 +90,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         return;
       }
       _showSnackBar('Connection timed out. Please try again.', isError: true);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(
+        CrashlyticsService.recordHandledError(
+          error,
+          stackTrace,
+          reason:
+              'ResetPasswordScreen._submit: unexpected reset-password failure',
+          information: {'screen': 'ResetPasswordScreen'},
+        ),
+      );
       if (!mounted) {
         return;
       }
@@ -103,7 +116,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? colors.errorContainer : colors.secondaryContainer,
+        backgroundColor: isError
+            ? colors.errorContainer
+            : colors.secondaryContainer,
       ),
     );
   }
@@ -208,7 +223,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                 textInputAction: TextInputAction.next,
                                 decoration: InputDecoration(
                                   labelText: 'New password',
-                                  prefixIcon: const Icon(Icons.password_rounded),
+                                  prefixIcon: const Icon(
+                                    Icons.password_rounded,
+                                  ),
                                   suffixIcon: IconButton(
                                     onPressed: () {
                                       setState(() {
@@ -229,14 +246,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                 controller: _confirmPasswordController,
                                 obscureText: _hideConfirmPassword,
                                 textInputAction: TextInputAction.done,
-                                onFieldSubmitted: (_) => _isSubmitting ? null : _submit(),
+                                onFieldSubmitted: (_) =>
+                                    _isSubmitting ? null : _submit(),
                                 decoration: InputDecoration(
                                   labelText: 'Confirm new password',
-                                  prefixIcon: const Icon(Icons.verified_user_rounded),
+                                  prefixIcon: const Icon(
+                                    Icons.verified_user_rounded,
+                                  ),
                                   suffixIcon: IconButton(
                                     onPressed: () {
                                       setState(() {
-                                        _hideConfirmPassword = !_hideConfirmPassword;
+                                        _hideConfirmPassword =
+                                            !_hideConfirmPassword;
                                       });
                                     },
                                     icon: Icon(
@@ -257,9 +278,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                       ? const SizedBox(
                                           width: 18,
                                           height: 18,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
                                         )
-                                      : const Icon(Icons.check_circle_outline_rounded),
+                                      : const Icon(
+                                          Icons.check_circle_outline_rounded,
+                                        ),
                                   label: Text(
                                     _isSubmitting
                                         ? 'Resetting password...'

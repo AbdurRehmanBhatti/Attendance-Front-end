@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:app_links/app_links.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'dart:async';
+import 'dart:ui';
 
 import 'config/app_theme.dart';
+import 'firebase_options.dart';
 import 'config/page_transitions.dart';
 import 'config/prefs_keys.dart';
 import 'models/user.dart';
@@ -19,8 +23,21 @@ import 'screens/reset_password_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_session_storage.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Pass all uncaught "fatal" errors from the framework to Crashlytics
+  FlutterError.onError = (errorDetails) {
+    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+  };
+
+  // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+
   runApp(const AttendanceApp());
 }
 
@@ -60,8 +77,10 @@ class _AttendanceAppState extends State<AttendanceApp> {
   }
 
   void _seedPendingResetFromDefaultRoute() {
-    final defaultRouteName = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
-    if (defaultRouteName.trim().isEmpty || defaultRouteName == Navigator.defaultRouteName) {
+    final defaultRouteName =
+        WidgetsBinding.instance.platformDispatcher.defaultRouteName;
+    if (defaultRouteName.trim().isEmpty ||
+        defaultRouteName == Navigator.defaultRouteName) {
       return;
     }
 
@@ -199,7 +218,10 @@ class _AttendanceAppState extends State<AttendanceApp> {
       final currentPendingArgs = _pendingResetArgs;
       if (navigator == null || currentPendingArgs == null) {
         if (currentPendingArgs != null) {
-          Future<void>.delayed(const Duration(milliseconds: 120), _tryOpenPendingResetLink);
+          Future<void>.delayed(
+            const Duration(milliseconds: 120),
+            _tryOpenPendingResetLink,
+          );
         }
         return;
       }
@@ -259,7 +281,9 @@ class _AttendanceAppState extends State<AttendanceApp> {
     };
   }
 
-  Route<dynamic> _buildHomeOrLogin({SlideDirection direction = SlideDirection.up}) {
+  Route<dynamic> _buildHomeOrLogin({
+    SlideDirection direction = SlideDirection.up,
+  }) {
     final args = _initialArgs;
     final currentUser = ApiService.currentUser;
 
@@ -274,20 +298,18 @@ class _AttendanceAppState extends State<AttendanceApp> {
 
     final userId = (args?['userId'] as int?) ?? currentUser?.id;
     final companyId = (args?['companyId'] as int?) ?? currentUser?.companyId;
-    final companyName = (args?['companyName'] as String?) ?? currentUser?.companyName;
+    final companyName =
+        (args?['companyName'] as String?) ?? currentUser?.companyName;
     final userName = (args?['userName'] as String?) ?? currentUser?.name;
 
     if (userId == null ||
         companyId == null ||
-      companyName == null ||
-      companyName.trim().isEmpty ||
+        companyName == null ||
+        companyName.trim().isEmpty ||
         userName == null ||
         userName.trim().isEmpty ||
         (currentUser != null && !currentUser.isEmployee)) {
-      return SlideFadeRoute(
-        page: const LoginScreen(),
-        direction: direction,
-      );
+      return SlideFadeRoute(page: const LoginScreen(), direction: direction);
     }
 
     return SlideFadeRoute(
@@ -317,7 +339,8 @@ class _AttendanceAppState extends State<AttendanceApp> {
 
     final userId = (args?['userId'] as int?) ?? currentUser?.id;
     final companyId = (args?['companyId'] as int?) ?? currentUser?.companyId;
-    final companyName = (args?['companyName'] as String?) ?? currentUser?.companyName;
+    final companyName =
+        (args?['companyName'] as String?) ?? currentUser?.companyName;
     final userName = (args?['userName'] as String?) ?? currentUser?.name;
 
     if (userId == null ||
@@ -352,11 +375,7 @@ class _AttendanceAppState extends State<AttendanceApp> {
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: ThemeMode.system,
-        home: const Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
+        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
 
@@ -378,7 +397,8 @@ class _AttendanceAppState extends State<AttendanceApp> {
     if (routeName != null &&
         (routeName.startsWith(AttendanceApp.resetPasswordRoute) ||
             routeName.contains('/reset-password?'))) {
-      final parsedArgs = _extractResetArgsFromRawRoute(routeName) ?? _lastValidResetArgs;
+      final parsedArgs =
+          _extractResetArgsFromRawRoute(routeName) ?? _lastValidResetArgs;
       final userId = parsedArgs?['userId'] as int?;
       final token = parsedArgs?['token'] as String?;
 
@@ -428,9 +448,7 @@ class _AttendanceAppState extends State<AttendanceApp> {
         );
 
       case AttendanceApp.historyRoute:
-        return SlideFadeRoute(
-          page: const HistoryScreen(),
-        );
+        return SlideFadeRoute(page: const HistoryScreen());
 
       case AttendanceApp.myAccountRoute:
         return SlideFadeRoute(
@@ -453,4 +471,3 @@ class _AttendanceAppState extends State<AttendanceApp> {
     }
   }
 }
-
