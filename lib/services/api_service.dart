@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,6 +10,7 @@ import '../models/attendance.dart';
 import '../models/attendance_history.dart';
 import '../models/user.dart';
 import 'auth_session_storage.dart';
+import 'crashlytics_service.dart';
 
 class ApiService {
   static const _timeout = Duration(seconds: 15);
@@ -31,11 +33,13 @@ class ApiService {
   static void restoreSession(User user) {
     _currentUser = user;
     _authToken = user.token;
+    unawaited(CrashlyticsService.setUserContext(user));
   }
 
   static void clearSession() {
     _authToken = null;
     _currentUser = null;
+    unawaited(CrashlyticsService.clearUserContext());
   }
 
   // POST /api/auth/login
@@ -106,7 +110,15 @@ class ApiService {
       if (message != null && message.trim().isNotEmpty) {
         return message;
       }
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      unawaited(
+        CrashlyticsService.recordHandledError(
+          error,
+          stackTrace,
+          reason: 'ApiService.forgotPassword: response message parse failed',
+        ),
+      );
+    }
 
     return 'If the email exists in our system, a password reset link has been generated.';
   }
@@ -331,7 +343,15 @@ class ApiService {
       clearSession();
       await AuthSessionStorage.clear();
       return false;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(
+        CrashlyticsService.recordHandledError(
+          error,
+          stackTrace,
+          reason:
+              'ApiService._refreshTokenWithSingleFlight: unexpected refresh failure',
+        ),
+      );
       clearSession();
       await AuthSessionStorage.clear();
       return false;
@@ -425,7 +445,16 @@ class ApiService {
           metadata: _toStringMap(json['metadata']),
         );
       }
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      unawaited(
+        CrashlyticsService.recordHandledError(
+          error,
+          stackTrace,
+          reason:
+              'ApiService._parseErrorPayload: failed to decode API error payload',
+        ),
+      );
+    }
 
     if (body.trim().isEmpty) {
       return _ParsedApiError(message: fallback);

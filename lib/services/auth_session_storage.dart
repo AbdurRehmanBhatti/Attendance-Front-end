@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user.dart';
+import 'crashlytics_service.dart';
 
 class AuthSessionStorage {
   AuthSessionStorage._();
@@ -37,15 +38,18 @@ class AuthSessionStorage {
 
     try {
       final json = jsonDecode(raw) as Map<String, dynamic>;
-      var refreshToken = (await _secureStorage.read(key: _refreshTokenKey)) ??
-          '';
+      var refreshToken =
+          (await _secureStorage.read(key: _refreshTokenKey)) ?? '';
 
       // One-time migration for sessions created before secure refresh-token storage.
       if (refreshToken.trim().isEmpty) {
         final legacyRefresh = json['refreshToken']?.toString() ?? '';
         if (legacyRefresh.trim().isNotEmpty) {
           refreshToken = legacyRefresh;
-          await _secureStorage.write(key: _refreshTokenKey, value: legacyRefresh);
+          await _secureStorage.write(
+            key: _refreshTokenKey,
+            value: legacyRefresh,
+          );
           json.remove('refreshToken');
           await prefs.setString(_sessionKey, jsonEncode(json));
         }
@@ -53,7 +57,12 @@ class AuthSessionStorage {
 
       json['refreshToken'] = refreshToken;
       return User.fromJson(json);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await CrashlyticsService.recordHandledError(
+        error,
+        stackTrace,
+        reason: 'AuthSessionStorage.loadUser: failed to restore cached session',
+      );
       await prefs.remove(_sessionKey);
       await _secureStorage.delete(key: _refreshTokenKey);
       return null;

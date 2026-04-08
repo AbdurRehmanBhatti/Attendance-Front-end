@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "576528444163",
+    "project_id": "time-sphere-51836",
+    "storage_bucket": "time-sphere-51836.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:576528444163:android:9eac988a6bcf3ed8661736",
+        "android_client_info": {
+          "package_name": "com.timesphere.attendanceapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqD-Zt0bHyeBMGJUqA-iRpABdCGF6dio0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

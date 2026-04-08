@@ -10,6 +10,7 @@ import '../screens/change_password_screen.dart';
 import '../screens/home_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_session_storage.dart';
+import '../services/crashlytics_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -39,16 +40,16 @@ class _LoginScreenState extends State<LoginScreen>
       vsync: this,
       duration: AppDurations.emphasis,
     );
-    _shakeAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0, end: -12), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: -12, end: 12), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: 12, end: -8), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: -8, end: 8), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: 8, end: 0), weight: 1),
-    ]).animate(CurvedAnimation(
-      parent: _shakeController,
-      curve: Curves.easeInOut,
-    ));
+    _shakeAnimation =
+        TweenSequence<double>([
+          TweenSequenceItem(tween: Tween(begin: 0, end: -12), weight: 1),
+          TweenSequenceItem(tween: Tween(begin: -12, end: 12), weight: 2),
+          TweenSequenceItem(tween: Tween(begin: 12, end: -8), weight: 2),
+          TweenSequenceItem(tween: Tween(begin: -8, end: 8), weight: 2),
+          TweenSequenceItem(tween: Tween(begin: 8, end: 0), weight: 1),
+        ]).animate(
+          CurvedAnimation(parent: _shakeController, curve: Curves.easeInOut),
+        );
   }
 
   @override
@@ -123,7 +124,15 @@ class _LoginScreenState extends State<LoginScreen>
       if (!mounted) return;
       _shakeController.forward(from: 0);
       _showErrorSnackBar('Connection timed out. Please try again.');
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(
+        CrashlyticsService.recordHandledError(
+          error,
+          stackTrace,
+          reason: 'LoginScreen._handleLogin: unexpected login failure',
+          information: {'screen': 'LoginScreen'},
+        ),
+      );
       if (!mounted) return;
       _shakeController.forward(from: 0);
       _showErrorSnackBar('Network error. Check your connection.');
@@ -197,146 +206,145 @@ class _LoginScreenState extends State<LoginScreen>
 
   Widget _buildCard(ColorScheme colors, TextTheme textTheme) {
     return Card(
-      elevation: 8,
-      shadowColor: colors.shadow.withValues(alpha: 0.3),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ── Logo / Icon ──
-              Hero(
-                tag: 'app-logo',
-                child: Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: colors.primaryContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.access_time_filled_rounded,
-                    size: 36,
-                    color: colors.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // ── Title ──
-              Text(
-                'Welcome Back',
-                style: textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colors.onSurface,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Sign in to mark your attendance',
-                style: textTheme.bodyMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-
-              // ── Email Field ──
-              TextFormField(
-                controller: _emailController,
-                textInputAction: TextInputAction.next,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: Icon(Icons.alternate_email_rounded),
-                ),
-                validator: (v) {
-                  final value = v?.trim() ?? '';
-                  if (value.isEmpty) {
-                    return 'Email is required';
-                  }
-                  final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
-                  if (!emailRegex.hasMatch(value)) {
-                    return 'Enter a valid email address';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-
-              // ── Password Field ──
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => _handleLogin(),
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                    ),
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
-                  ),
-                ),
-                validator: (v) =>
-                    (v == null || v.isEmpty) ? 'Password is required' : null,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () {
-                          Navigator.of(context).pushNamed(
-                            AttendanceApp.forgotPasswordRoute,
-                          );
-                        },
-                  child: const Text('Forgot Password?'),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-
-              // ── Login Button ──
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: FilledButton(
-                  onPressed: _isLoading ? null : _handleLogin,
-                  child: AnimatedSwitcher(
-                    duration: AppDurations.fast,
-                    child: _isLoading
-                        ? const SizedBox(
-                            key: ValueKey('loader'),
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            key: ValueKey('text'),
-                            'Sign In',
-                          ),
-                  ),
-                ),
-              ),
-            ],
+          elevation: 8,
+          shadowColor: colors.shadow.withValues(alpha: 0.3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
           ),
-        ),
-      ),
-    )
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Logo / Icon ──
+                  Hero(
+                    tag: 'app-logo',
+                    child: Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: colors.primaryContainer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.access_time_filled_rounded,
+                        size: 36,
+                        color: colors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // ── Title ──
+                  Text(
+                    'Welcome Back',
+                    style: textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Sign in to mark your attendance',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  // ── Email Field ──
+                  TextFormField(
+                    controller: _emailController,
+                    textInputAction: TextInputAction.next,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      prefixIcon: Icon(Icons.alternate_email_rounded),
+                    ),
+                    validator: (v) {
+                      final value = v?.trim() ?? '';
+                      if (value.isEmpty) {
+                        return 'Email is required';
+                      }
+                      final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+                      if (!emailRegex.hasMatch(value)) {
+                        return 'Enter a valid email address';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // ── Password Field ──
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _handleLogin(),
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
+                      ),
+                    ),
+                    validator: (v) => (v == null || v.isEmpty)
+                        ? 'Password is required'
+                        : null,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              Navigator.of(
+                                context,
+                              ).pushNamed(AttendanceApp.forgotPasswordRoute);
+                            },
+                      child: const Text('Forgot Password?'),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+
+                  // ── Login Button ──
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: _isLoading ? null : _handleLogin,
+                      child: AnimatedSwitcher(
+                        duration: AppDurations.fast,
+                        child: _isLoading
+                            ? const SizedBox(
+                                key: ValueKey('loader'),
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(key: ValueKey('text'), 'Sign In'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        )
         .animate()
         .fadeIn(duration: AppDurations.emphasis)
         .slideY(

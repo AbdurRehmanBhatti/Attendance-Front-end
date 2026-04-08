@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_theme.dart';
 import '../config/page_transitions.dart';
 import '../config/prefs_keys.dart';
+import '../services/crashlytics_service.dart';
 import 'login_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -29,21 +30,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(AppPrefsKeys.onboardingSeen, true);
-    } catch (_) {
+    } catch (error, stackTrace) {
       // Continue to login even if local preference persistence fails.
+      await CrashlyticsService.recordHandledError(
+        error,
+        stackTrace,
+        reason:
+            'OnboardingScreen._completeOnboarding: failed to persist onboarding flag',
+        information: {'screen': 'OnboardingScreen'},
+      );
     }
 
     if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
-      SlideFadeRoute(
-        page: const LoginScreen(),
-        direction: SlideDirection.up,
-      ),
+      SlideFadeRoute(page: const LoginScreen(), direction: SlideDirection.up),
     );
   }
 
-  Widget _buildImage(String assetPath, {required Color primaryColor, required Color dotInactiveColor}) {
+  Widget _buildImage(
+    String assetPath, {
+    required Color primaryColor,
+    required Color dotInactiveColor,
+  }) {
     final isSvg = assetPath.toLowerCase().endsWith('.svg');
 
     return SizedBox(
@@ -80,19 +89,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }) {
     return PageDecoration(
       pageColor: surfaceColor,
-      imagePadding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.lg),
+      imagePadding: const EdgeInsets.only(
+        top: AppSpacing.md,
+        bottom: AppSpacing.lg,
+      ),
       imageFlex: 5,
       bodyFlex: 4,
-      titleTextStyle: textTheme.headlineSmall?.copyWith(
+      titleTextStyle:
+          textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w700,
             color: titleColor,
             height: 1.15,
           ) ??
           const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
-      bodyTextStyle: textTheme.bodyLarge?.copyWith(
-            color: bodyColor,
-            height: 1.4,
-          ) ??
+      bodyTextStyle:
+          textTheme.bodyLarge?.copyWith(color: bodyColor, height: 1.4) ??
           const TextStyle(fontSize: 16, height: 1.4),
       titlePadding: const EdgeInsets.only(bottom: AppSpacing.md),
       bodyPadding: const EdgeInsets.fromLTRB(
@@ -145,8 +156,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
       PageViewModel(
         title: 'Your Attendance, Your History',
-        body:
-            'View your complete attendance history and records anytime.',
+        body: 'View your complete attendance history and records anytime.',
         image: _buildImage(
           'assets/images/onboarding_3.svg',
           primaryColor: primaryColor,
