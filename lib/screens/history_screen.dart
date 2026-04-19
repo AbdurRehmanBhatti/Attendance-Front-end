@@ -69,15 +69,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final nowUtc = DateTime.now().toUtc();
       final range = _selectedTab.toDateRange(nowUtc);
-      final response = await _apiService.getAttendanceHistory(
-        startUtc: range.start,
-        endUtc: range.end,
-      );
+      final responses = await Future.wait<dynamic>([
+        _apiService.getAttendanceHistory(
+          startUtc: range.start,
+          endUtc: range.end,
+        ),
+        _apiService.getMyAttendanceHistoryDetail(
+          startUtc: range.start,
+          endUtc: range.end,
+        ),
+      ]);
+
+      final summaryResponse = responses[0] as AttendanceHistoryResponse;
+      final detailResponse = responses[1] as AttendanceHistoryDetailResponse;
+      final currentUserId = ApiService.currentUser?.id ?? 0;
 
       if (!mounted) return;
       setState(() {
-        _records = response.records;
-        _totals = response.totals;
+        _records = detailResponse.toAttendanceRecords(userId: currentUserId);
+        _totals = summaryResponse.totals;
         _isLoading = false;
       });
     } on PasswordChangeRequiredApiException {

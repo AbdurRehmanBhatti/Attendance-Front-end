@@ -21,12 +21,14 @@ import '../screens/login_screen.dart';
 import '../services/api_service.dart';
 import '../services/auth_session_storage.dart';
 import '../services/crashlytics_service.dart';
+import '../services/in_app_update_service.dart';
 import '../services/location_service.dart';
 import '../widgets/animated_clock_button.dart';
 import '../widgets/status_indicator.dart';
 
 enum _HeaderAction {
   myAccount,
+  leaveManagement,
   changePassword,
   deleteAccount,
   logoutAll,
@@ -54,6 +56,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _apiService = ApiService();
   final _locationService = LocationService();
+  final _inAppUpdateService = InAppUpdateService();
   final GlobalKey _clockActionKey = GlobalKey();
   final GlobalKey _statusCardKey = GlobalKey();
   final GlobalKey _historyEntryKey = GlobalKey();
@@ -77,7 +80,14 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowHomeTutorial();
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkInAppUpdate();
+    });
     _fetchTodayStatus();
+  }
+
+  Future<void> _checkInAppUpdate() async {
+    await _inAppUpdateService.checkAndTriggerUpdateIfAvailable();
   }
 
   Future<void> _checkAndShowHomeTutorial() async {
@@ -826,10 +836,23 @@ class _HomeScreenState extends State<HomeScreen> {
     await Navigator.of(context).pushNamed(AttendanceApp.myAccountRoute);
   }
 
+  Future<void> _navigateToLeaveManagement() async {
+    await Navigator.of(context).pushNamed(AttendanceApp.leaveManagementRoute);
+
+    if (!mounted) {
+      return;
+    }
+
+    await _fetchTodayStatus();
+  }
+
   Future<void> _onHeaderActionSelected(_HeaderAction action) async {
     switch (action) {
       case _HeaderAction.myAccount:
         await _navigateToMyAccount();
+        return;
+      case _HeaderAction.leaveManagement:
+        await _navigateToLeaveManagement();
         return;
       case _HeaderAction.changePassword:
         await _navigateToChangePassword();
@@ -910,11 +933,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // ── History Link ──
               Center(
-                child: TextButton.icon(
-                  key: _historyEntryKey,
-                  onPressed: _navigateToHistory,
-                  icon: const Icon(Icons.history_rounded),
-                  label: const Text('View Full History'),
+                child: Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      key: _historyEntryKey,
+                      onPressed: _navigateToHistory,
+                      icon: const Icon(Icons.history_rounded),
+                      label: const Text('View Full History'),
+                    ),
+                    TextButton.icon(
+                      onPressed: _navigateToLeaveManagement,
+                      icon: const Icon(Icons.event_note_rounded),
+                      label: const Text('Leave & Corrections'),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -965,6 +1000,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     PopupMenuItem<_HeaderAction>(
                       value: _HeaderAction.myAccount,
                       child: Text('My Account'),
+                    ),
+                    PopupMenuItem<_HeaderAction>(
+                      value: _HeaderAction.leaveManagement,
+                      child: Text('Leave & Corrections'),
                     ),
                     PopupMenuItem<_HeaderAction>(
                       value: _HeaderAction.changePassword,

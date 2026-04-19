@@ -1,5 +1,19 @@
 # Play Store Release Notes
 
+## Version 1.0.3
+
+This release delivers employee self-service enhancements and release-readiness updates:
+
+- Added My Account live self-service data (profile, leave balance, and upcoming schedule)
+- Added detailed attendance history records with pending correction visibility
+- Improved My Account UI layout for better readability on small screens
+- Added Android in-app update support (Play Core immediate/flexible update flows)
+- Stability and architecture improvements aligned with the latest backend phase rollout
+
+If you want a shorter Play Console version, use this text:
+
+"Added My Account self-service insights, richer attendance history, polished account UI, and Android in-app update support."
+
 ## Version 1.0.1
 
 This update improves first-time experience and attendance readability:

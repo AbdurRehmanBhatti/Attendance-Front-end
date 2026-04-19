@@ -16,6 +16,7 @@ import 'screens/delete_account_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/leave_management_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/my_account_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -51,6 +52,7 @@ class AttendanceApp extends StatefulWidget {
   static const String resetPasswordRoute = '/reset-password';
   static const String historyRoute = '/history';
   static const String myAccountRoute = '/my-account';
+  static const String leaveManagementRoute = '/leave-management';
   static const String deleteAccountRoute = '/delete-account';
 
   @override
@@ -453,6 +455,12 @@ class _AttendanceAppState extends State<AttendanceApp> {
       case AttendanceApp.myAccountRoute:
         return SlideFadeRoute(
           page: const MyAccountScreen(),
+          direction: SlideDirection.up,
+        );
+
+      case AttendanceApp.leaveManagementRoute:
+        return SlideFadeRoute(
+          page: const LeaveManagementScreen(),
           direction: SlideDirection.up,
         );
 

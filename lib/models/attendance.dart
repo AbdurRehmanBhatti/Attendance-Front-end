@@ -9,6 +9,7 @@ class Attendance {
   final double? longitude;
   final double? clockOutLatitude;
   final double? clockOutLongitude;
+  final bool hasPendingCorrection;
 
   Attendance({
     required this.id,
@@ -21,6 +22,7 @@ class Attendance {
     this.longitude,
     this.clockOutLatitude,
     this.clockOutLongitude,
+    this.hasPendingCorrection = false,
   });
 
   factory Attendance.fromJson(Map<String, dynamic> json) {
@@ -39,6 +41,7 @@ class Attendance {
       longitude: (json['longitude'] as num?)?.toDouble(),
       clockOutLatitude: (json['clockOutLatitude'] as num?)?.toDouble(),
       clockOutLongitude: (json['clockOutLongitude'] as num?)?.toDouble(),
+      hasPendingCorrection: json['hasPendingCorrection'] as bool? ?? false,
     );
   }
 

@@ -8,6 +8,8 @@ import '../config/api_config.dart';
 import '../models/account_deletion.dart';
 import '../models/attendance.dart';
 import '../models/attendance_history.dart';
+import '../models/leave_management.dart';
+import '../models/self_service.dart';
 import '../models/user.dart';
 import 'auth_session_storage.dart';
 import 'crashlytics_service.dart';
@@ -257,6 +259,208 @@ class ApiService {
     final end = start.add(const Duration(days: 1));
     final response = await getAttendanceHistory(startUtc: start, endUtc: end);
     return response.records;
+  }
+
+  // GET /api/me/leave-management/holidays
+  Future<List<HolidayEntry>> getMyHolidays() async {
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}/api/me/leave-management/holidays',
+    );
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http.get(uri, headers: headers).timeout(_timeout),
+    );
+
+    final json = jsonDecode(response.body) as List<dynamic>;
+    return json
+        .whereType<Map<String, dynamic>>()
+        .map(HolidayEntry.fromJson)
+        .toList(growable: false);
+  }
+
+  // GET /api/me/profile
+  Future<MeProfile> getMyProfile() async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/me/profile');
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http.get(uri, headers: headers).timeout(_timeout),
+    );
+
+    return MeProfile.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  // GET /api/me/attendance-history-detail?startDateUtc=...&endDateUtc=...
+  Future<AttendanceHistoryDetailResponse> getMyAttendanceHistoryDetail({
+    DateTime? startUtc,
+    DateTime? endUtc,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/me/attendance-history-detail').replace(
+      queryParameters: {
+        if (startUtc != null) 'startDateUtc': startUtc.toUtc().toIso8601String(),
+        if (endUtc != null) 'endDateUtc': endUtc.toUtc().toIso8601String(),
+      },
+    );
+
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http.get(uri, headers: headers).timeout(_timeout),
+    );
+
+    return AttendanceHistoryDetailResponse.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  // GET /api/me/leave-balance?year=...
+  Future<MeLeaveBalanceResponse> getMyLeaveBalance({int? year}) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/me/leave-balance').replace(
+      queryParameters: {
+        if (year != null) 'year': year.toString(),
+      },
+    );
+
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http.get(uri, headers: headers).timeout(_timeout),
+    );
+
+    return MeLeaveBalanceResponse.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  // GET /api/me/schedule?startDateUtc=...&endDateUtc=...
+  Future<MeScheduleResponse> getMySchedule({
+    DateTime? startUtc,
+    DateTime? endUtc,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/me/schedule').replace(
+      queryParameters: {
+        if (startUtc != null) 'startDateUtc': startUtc.toUtc().toIso8601String(),
+        if (endUtc != null) 'endDateUtc': endUtc.toUtc().toIso8601String(),
+      },
+    );
+
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http.get(uri, headers: headers).timeout(_timeout),
+    );
+
+    return MeScheduleResponse.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  // GET /api/me/leave-management/leave-requests
+  Future<List<MyLeaveRequest>> getMyLeaveRequests({String? status}) async {
+    final uri =
+        Uri.parse(
+          '${ApiConfig.baseUrl}/api/me/leave-management/leave-requests',
+        ).replace(
+          queryParameters: {
+            if (status != null && status.trim().isNotEmpty)
+              'status': status.trim(),
+          },
+        );
+
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http.get(uri, headers: headers).timeout(_timeout),
+    );
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = (payload['items'] as List<dynamic>? ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(MyLeaveRequest.fromJson)
+        .toList(growable: false);
+    return items;
+  }
+
+  // POST /api/me/leave-management/leave-requests
+  Future<MyLeaveRequest> createMyLeaveRequest({
+    required String leaveType,
+    required DateTime startDateUtc,
+    required DateTime endDateUtc,
+    String? reason,
+  }) async {
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}/api/me/leave-management/leave-requests',
+    );
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http
+          .post(
+            uri,
+            headers: headers,
+            body: jsonEncode({
+              'leaveType': leaveType,
+              'startDateUtc': startDateUtc.toUtc().toIso8601String(),
+              'endDateUtc': endDateUtc.toUtc().toIso8601String(),
+              if (reason != null && reason.trim().isNotEmpty)
+                'reason': reason.trim(),
+            }),
+          )
+          .timeout(_timeout),
+    );
+
+    return MyLeaveRequest.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  // GET /api/me/leave-management/attendance-corrections
+  Future<List<MyAttendanceCorrection>> getMyAttendanceCorrections({
+    String? status,
+  }) async {
+    final uri =
+        Uri.parse(
+          '${ApiConfig.baseUrl}/api/me/leave-management/attendance-corrections',
+        ).replace(
+          queryParameters: {
+            if (status != null && status.trim().isNotEmpty)
+              'status': status.trim(),
+          },
+        );
+
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http.get(uri, headers: headers).timeout(_timeout),
+    );
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = (payload['items'] as List<dynamic>? ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(MyAttendanceCorrection.fromJson)
+        .toList(growable: false);
+    return items;
+  }
+
+  // POST /api/me/leave-management/attendance-corrections
+  Future<MyAttendanceCorrection> createMyAttendanceCorrection({
+    required DateTime requestDateUtc,
+    DateTime? requestedClockInTimeUtc,
+    DateTime? requestedClockOutTimeUtc,
+    required String reason,
+  }) async {
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}/api/me/leave-management/attendance-corrections',
+    );
+    final response = await _sendAuthenticatedRequest(
+      (headers) => http
+          .post(
+            uri,
+            headers: headers,
+            body: jsonEncode({
+              'requestDateUtc': requestDateUtc.toUtc().toIso8601String(),
+              if (requestedClockInTimeUtc != null)
+                'requestedClockInTimeUtc': requestedClockInTimeUtc
+                    .toUtc()
+                    .toIso8601String(),
+              if (requestedClockOutTimeUtc != null)
+                'requestedClockOutTimeUtc': requestedClockOutTimeUtc
+                    .toUtc()
+                    .toIso8601String(),
+              'reason': reason.trim(),
+            }),
+          )
+          .timeout(_timeout),
+    );
+
+    return MyAttendanceCorrection.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   // POST /api/me/delete-account

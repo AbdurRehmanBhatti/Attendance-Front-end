@@ -78,3 +78,129 @@ class AttendanceHistoryResponse {
     return DateTime.parse(normalized).toUtc();
   }
 }
+
+class AttendanceHistoryDetailResponse {
+  final DateTime periodStartUtc;
+  final DateTime periodEndUtc;
+  final List<AttendanceHistoryDetailItem> items;
+
+  const AttendanceHistoryDetailResponse({
+    required this.periodStartUtc,
+    required this.periodEndUtc,
+    required this.items,
+  });
+
+  factory AttendanceHistoryDetailResponse.fromJson(Map<String, dynamic> json) {
+    final itemsJson = json['items'] as List<dynamic>? ?? const <dynamic>[];
+    return AttendanceHistoryDetailResponse(
+      periodStartUtc: _parseApiUtcDateTime(json['periodStartUtc'] as String?),
+      periodEndUtc: _parseApiUtcDateTime(json['periodEndUtc'] as String?),
+      items: itemsJson
+          .whereType<Map<String, dynamic>>()
+          .map(AttendanceHistoryDetailItem.fromJson)
+          .toList(growable: false),
+    );
+  }
+
+  List<Attendance> toAttendanceRecords({required int userId}) {
+    return items
+        .map(
+          (item) => Attendance(
+            id: item.attendanceId,
+            userId: userId,
+            officeId: item.officeId,
+            officeName: item.officeName,
+            clockIn: item.clockInTimeUtc,
+            clockOut: item.clockOutTimeUtc,
+            latitude: item.clockInLatitude,
+            longitude: item.clockInLongitude,
+            clockOutLatitude: item.clockOutLatitude,
+            clockOutLongitude: item.clockOutLongitude,
+            hasPendingCorrection: item.hasPendingCorrection,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  static DateTime _parseApiUtcDateTime(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    }
+
+    final raw = value.trim();
+    final hasTimezone =
+        raw.endsWith('Z') || RegExp(r'[+-]\d{2}:\d{2}$').hasMatch(raw);
+
+    final normalized = hasTimezone ? raw : '${raw}Z';
+    return DateTime.parse(normalized).toUtc();
+  }
+}
+
+class AttendanceHistoryDetailItem {
+  final int attendanceId;
+  final int? officeId;
+  final String? officeName;
+  final DateTime? clockInTimeUtc;
+  final DateTime? clockOutTimeUtc;
+  final int durationMinutes;
+  final double? clockInLatitude;
+  final double? clockInLongitude;
+  final double? clockOutLatitude;
+  final double? clockOutLongitude;
+  final bool hasPendingCorrection;
+
+  const AttendanceHistoryDetailItem({
+    required this.attendanceId,
+    required this.officeId,
+    required this.officeName,
+    required this.clockInTimeUtc,
+    required this.clockOutTimeUtc,
+    required this.durationMinutes,
+    required this.clockInLatitude,
+    required this.clockInLongitude,
+    required this.clockOutLatitude,
+    required this.clockOutLongitude,
+    required this.hasPendingCorrection,
+  });
+
+  factory AttendanceHistoryDetailItem.fromJson(Map<String, dynamic> json) {
+    return AttendanceHistoryDetailItem(
+      attendanceId: (json['attendanceId'] as num?)?.toInt() ?? 0,
+      officeId: (json['officeId'] as num?)?.toInt(),
+      officeName: json['officeName']?.toString(),
+      clockInTimeUtc: _parseOptionalApiUtcDateTime(
+        json['clockInTimeUtc']?.toString(),
+      ),
+      clockOutTimeUtc: _parseOptionalApiUtcDateTime(
+        json['clockOutTimeUtc']?.toString(),
+      ),
+      durationMinutes: (json['durationMinutes'] as num?)?.toInt() ?? 0,
+      clockInLatitude: (json['clockInLatitude'] as num?)?.toDouble(),
+      clockInLongitude: (json['clockInLongitude'] as num?)?.toDouble(),
+      clockOutLatitude: (json['clockOutLatitude'] as num?)?.toDouble(),
+      clockOutLongitude: (json['clockOutLongitude'] as num?)?.toDouble(),
+      hasPendingCorrection: json['hasPendingCorrection'] as bool? ?? false,
+    );
+  }
+
+  static DateTime _parseApiUtcDateTime(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    }
+
+    final raw = value.trim();
+    final hasTimezone =
+        raw.endsWith('Z') || RegExp(r'[+-]\d{2}:\d{2}$').hasMatch(raw);
+
+    final normalized = hasTimezone ? raw : '${raw}Z';
+    return DateTime.parse(normalized).toUtc();
+  }
+
+  static DateTime? _parseOptionalApiUtcDateTime(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null;
+    }
+
+    return _parseApiUtcDateTime(value);
+  }
+}

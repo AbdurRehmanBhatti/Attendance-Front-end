@@ -33,6 +33,11 @@ class _AttendanceCardState extends State<AttendanceCard> {
     return '${m}m';
   }
 
+  String _fmtCoordinate(double? value) {
+    if (value == null) return 'N/A';
+    return value.toStringAsFixed(5);
+  }
+
   @override
   Widget build(BuildContext context) {
     final att = widget.attendance;
@@ -93,6 +98,26 @@ class _AttendanceCardState extends State<AttendanceCard> {
                                 : colors.onSurfaceVariant,
                           ),
                         ),
+                        if (att.hasPendingCorrection) ...[
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xs,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colors.errorContainer,
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                            ),
+                            child: Text(
+                              'Pending correction',
+                              style: textTheme.labelSmall?.copyWith(
+                                color: colors.onErrorContainer,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -175,6 +200,35 @@ class _AttendanceCardState extends State<AttendanceCard> {
                           colors,
                         ),
                       ],
+                      if (att.hasPendingCorrection) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        _detailRow(
+                          'Correction',
+                          'Pending review',
+                          Icons.pending_actions_rounded,
+                          colors.error,
+                          textTheme,
+                          colors,
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.sm),
+                      _detailRow(
+                        'Clock In GPS',
+                        '${_fmtCoordinate(att.latitude)}, ${_fmtCoordinate(att.longitude)}',
+                        Icons.location_on_outlined,
+                        colors.primary,
+                        textTheme,
+                        colors,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      _detailRow(
+                        'Clock Out GPS',
+                        '${_fmtCoordinate(att.clockOutLatitude)}, ${_fmtCoordinate(att.clockOutLongitude)}',
+                        Icons.location_on_rounded,
+                        colors.primary,
+                        textTheme,
+                        colors,
+                      ),
                     ],
                   ),
                 ),

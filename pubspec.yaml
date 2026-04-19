@@ -1,7 +1,7 @@
 name: attendance_app
 description: "Attendance tracking app with clock-in/out and history."
 publish_to: 'none'
-version: 1.0.2+5
+version: 1.0.3+6
 
 environment:
   sdk: ^3.9.0
@@ -26,6 +26,7 @@ dependencies:
   firebase_core: ^4.6.0
   firebase_crashlytics: ^5.1.0
   firebase_analytics: ^12.2.0
+  in_app_update: ^4.2.3
 
 dev_dependencies:
   flutter_test:
