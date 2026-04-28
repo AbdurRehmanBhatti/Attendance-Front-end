@@ -1,5 +1,22 @@
 # Play Store Release Notes
 
+## Version 1.0.4
+
+Production first release of TimeSphere Attendance App with comprehensive employee self-service features:
+
+- **Clock In/Out**: Quick attendance actions with location support
+- **Attendance History**: Detailed records with corrections and pending status visibility
+- **My Account Dashboard**: Live self-service data including profile, leave balance, and upcoming schedule
+- **First-Time Experience**: Guided onboarding and Home screen walkthrough
+- **In-App Updates**: Android in-app update support for seamless app delivery
+- **Secure Session**: Automatic session restore with secure credential storage
+- **Dark Mode Support**: Full dark mode compatibility across all flows
+- **Stability**: Production-ready architecture with crash reporting and analytics
+
+If you want a shorter Play Console version, use this text:
+
+"TimeSphere 2.0 is production-ready with clock in/out, comprehensive attendance history, self-service account dashboard, guided onboarding, and secure session management."
+
 ## Version 1.0.3
 
 This release delivers employee self-service enhancements and release-readiness updates:
